@@ -1,0 +1,496 @@
+"""
+Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
+"""
+
+import json
+
+import pyperclip
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QHeaderView, QMenu
+
+
+class ModulesPanel(QWidget):
+    """ ModulesPanel
+
+        Signals:
+            onAddHook([ptr, funcname]) - MenuItem AddHook
+            onDumpBinary([ptr, size#int]) - MenuItem DumpBinary
+            onModuleSelected([ptr, size#int]) - ModuleDoubleClicked
+            onModuleFuncSelected(ptr) - FunctionDoubleClicked
+    """
+
+    onAddHook = pyqtSignal(list, name='onAddHook')
+    onDumpBinary = pyqtSignal(list, name='onDumpBinary')
+    onModuleSelected = pyqtSignal(list, name='onModuleSelected')
+    onModuleFuncSelected = pyqtSignal(str, name='onModuleFuncSelected')
+
+    def __init__(self, parent=None):
+        super(ModulesPanel, self).__init__(parent)
+        self._app_window = parent
+
+        if self._app_window.dwarf is None:
+            print('ModulesPanel created before Dwarf exists')
+            return
+
+        self._app_window.dwarf.onSetModules.connect(self.set_modules)
+
+        self._uppercase_hex = True
+
+        # setup models
+        self.modules_list = None
+        self.modules_model = QStandardItemModel(0, 4, self)
+        self.modules_model.setHeaderData(0, Qt.Horizontal, 'Name')
+        self.modules_model.setHeaderData(1, Qt.Horizontal, 'Base')
+        self.modules_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.modules_model.setHeaderData(2, Qt.Horizontal, 'Size')
+        self.modules_model.setHeaderData(2, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.modules_model.setHeaderData(3, Qt.Horizontal, 'Path')
+
+        self.imports_list = None
+        self.imports_model = QStandardItemModel(0, 4, self)
+        self.imports_model.setHeaderData(0, Qt.Horizontal, 'Import')
+        self.imports_model.setHeaderData(1, Qt.Horizontal, 'Address')
+        self.imports_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.imports_model.setHeaderData(2, Qt.Horizontal, 'Module')
+        self.imports_model.setHeaderData(2, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.imports_model.setHeaderData(3, Qt.Horizontal, 'Type')
+
+        self.exports_list = None
+        self.exports_model = QStandardItemModel(0, 3, self)
+        self.exports_model.setHeaderData(0, Qt.Horizontal, 'Export')
+        self.exports_model.setHeaderData(1, Qt.Horizontal, 'Address')
+        self.exports_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.exports_model.setHeaderData(2, Qt.Horizontal, 'Type')
+
+        self.symbols_list = None
+        self.symbols_model = QStandardItemModel(0, 3, self)
+        self.symbols_model.setHeaderData(0, Qt.Horizontal, 'Export')
+        self.symbols_model.setHeaderData(1, Qt.Horizontal, 'Address')
+        self.symbols_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.symbols_model.setHeaderData(2, Qt.Horizontal, 'Type')
+
+        # setup ui
+        main_wrapper = QVBoxLayout()
+        main_wrapper.setContentsMargins(0, 0, 0, 0)
+        h_box = QHBoxLayout()
+        self.modules_list = QTreeView()
+        self.modules_list.setHeaderHidden(False)
+        self.modules_list.setRootIsDecorated(False)
+        self.modules_list.setAutoFillBackground(True)
+        self.modules_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.modules_list.customContextMenuRequested.connect(
+            self._on_modules_contextmenu)
+        self.modules_list.setEditTriggers(self.modules_list.NoEditTriggers)
+        self.modules_list.clicked.connect(self._module_clicked)
+        self.modules_list.doubleClicked.connect(self._module_dblclicked)
+        self.modules_list.setModel(self.modules_model)
+        self.modules_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self.modules_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+        self.modules_list.header().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents)
+        h_box.addWidget(self.modules_list)
+
+        hv_box = QVBoxLayout()
+        self.imports_list = QTreeView()
+        self.imports_list.setHeaderHidden(False)
+        self.imports_list.setRootIsDecorated(False)
+        self.imports_list.setAutoFillBackground(True)
+        self.imports_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.imports_list.customContextMenuRequested.connect(
+            self._on_imports_contextmenu)
+        self.imports_list.setEditTriggers(self.modules_list.NoEditTriggers)
+        self.imports_list.doubleClicked.connect(self._import_dblclicked)
+        self.imports_list.setModel(self.imports_model)
+        self.imports_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self.imports_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+        self.imports_list.header().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents)
+        self.imports_list.setVisible(False)
+        self.exports_list = QTreeView()
+        self.exports_list.setHeaderHidden(False)
+        self.exports_list.setRootIsDecorated(False)
+        self.exports_list.setAutoFillBackground(True)
+        self.exports_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.exports_list.customContextMenuRequested.connect(
+            self._on_exports_contextmenu)
+        self.exports_list.setEditTriggers(self.modules_list.NoEditTriggers)
+        self.exports_list.doubleClicked.connect(self._export_dblclicked)
+        self.exports_list.setModel(self.exports_model)
+        self.exports_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self.exports_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+        self.exports_list.header().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents)
+        self.exports_list.setVisible(False)
+        self.symbols_list = QTreeView()
+        self.symbols_list.setHeaderHidden(False)
+        self.symbols_list.setRootIsDecorated(False)
+        self.symbols_list.setAlternatingRowColors(True)
+        self.symbols_list.setAutoFillBackground(True)
+        self.symbols_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.symbols_list.doubleClicked.connect(self._symbol_dblclicked)
+        self.symbols_list.setModel(self.symbols_model)
+        self.symbols_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self.symbols_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+        self.symbols_list.header().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents)
+        self.symbols_list.setVisible(False)
+        hv_box.addWidget(self.imports_list)
+        hv_box.addWidget(self.exports_list)
+        hv_box.addWidget(self.symbols_list)
+        h_box.addLayout(hv_box)
+        main_wrapper.addLayout(h_box)
+        self.setLayout(main_wrapper)
+
+    # ************************************************************************
+    # **************************** Properties ********************************
+    # ************************************************************************
+    @property
+    def uppercase_hex(self):
+        """ HexDisplayStyle
+        """
+        return self._uppercase_hex
+
+    @uppercase_hex.setter
+    def uppercase_hex(self, value):
+        """ HexDisplayStyle
+        """
+        if isinstance(value, bool):
+            self._uppercase_hex = value
+        elif isinstance(value, str):
+            self._uppercase_hex = (value == 'upper')
+
+    @property
+    def rows_dualcolor(self):
+        """ AlternatingRowColors
+        """
+        return self.modules_list.alternatingRowColors()
+
+    @rows_dualcolor.setter
+    def rows_dualcolor(self, value):
+        """ AlternatingRowColors
+        """
+        if isinstance(value, bool):
+            self.modules_list.setAlternatingRowColors(value)
+            self.exports_list.setAlternatingRowColors(value)
+            self.imports_list.setAlternatingRowColors(value)
+            self.symbols_list.setAlternatingRowColors(value)
+        elif isinstance(value, str):
+            self.modules_list.setAlternatingRowColors(value == 'True')
+            self.imports_list.setAlternatingRowColors(value == 'True')
+            self.exports_list.setAlternatingRowColors(value == 'True')
+            self.symbols_list.setAlternatingRowColors(value == 'True')
+
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
+    def set_modules(self, modules):
+        """ Fills the ModulesList with data
+        """
+        self.modules_model.removeRows(0, self.modules_model.rowCount())
+        for module in modules:
+            name = QStandardItem()
+            name.setTextAlignment(Qt.AlignLeft)
+            name.setText(module['name'])
+
+            base = QStandardItem()
+            base.setTextAlignment(Qt.AlignCenter)
+
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+
+            base.setText(str_fmt.format(int(module['base'], 16)))
+
+            size = QStandardItem()
+            size.setTextAlignment(Qt.AlignRight)
+            size.setText("{0:,d}".format(int(module['size'])))
+
+            path = QStandardItem()
+            path.setTextAlignment(Qt.AlignLeft)
+            path.setText(module['path'])
+
+            self.modules_model.appendRow([name, base, size, path])
+
+    def update_modules(self):
+        """ DwarfApiCall updateModules
+        """
+        return self._app_window.dwarf.dwarf_api('updateModules')
+
+    def set_imports(self, imports):
+        """ Fills the ImportsList with data
+        """
+        self.imports_model.removeRows(0, self.imports_model.rowCount())
+        for import_ in imports:
+            name = QStandardItem(0)
+            name.setTextAlignment(Qt.AlignLeft)
+            name.setText(import_['name'])
+
+            address = QStandardItem(1)
+            address.setTextAlignment(Qt.AlignCenter)
+
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+
+            address.setText(str_fmt.format(int(import_['address'], 16)))
+
+            module = QStandardItem(2)
+            module.setTextAlignment(Qt.AlignLeft)
+            module.setText(import_['module'])
+
+            type_ = QStandardItem(2)
+            type_.setTextAlignment(Qt.AlignLeft)
+            type_.setText(import_['type'])
+
+            self.imports_model.appendRow([name, address, module, type_])
+
+    def set_exports(self, exports):
+        """ Fills the ExportsList with data
+        """
+        self.exports_model.removeRows(0, self.exports_model.rowCount())
+        for export in exports:
+            name = QStandardItem(0)
+            name.setTextAlignment(Qt.AlignLeft)
+            name.setText(export['name'])
+
+            address = QStandardItem(1)
+            address.setTextAlignment(Qt.AlignCenter)
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+            address.setText(str_fmt.format(int(export['address'], 16)))
+
+            type_ = QStandardItem(2)
+            type_.setTextAlignment(Qt.AlignLeft)
+            type_.setText(export['type'])
+
+            self.exports_model.appendRow([name, address, type_])
+
+    def set_symbols(self, symbols):
+        """ Fills the SymbolsList with data
+        """
+        self.symbols_model.removeRows(0, self.symbols_model.rowCount())
+        for symbol in symbols:
+            name = QStandardItem(0)
+            name.setTextAlignment(Qt.AlignLeft)
+            name.setText(symbol['name'])
+
+            address = QStandardItem(1)
+            address.setTextAlignment(Qt.AlignCenter)
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+            address.setText(str_fmt.format(int(symbol['address'], 16)))
+
+            type_ = QStandardItem(2)
+            type_.setTextAlignment(Qt.AlignLeft)
+            type_.setText(symbol['type'])
+
+            self.symbols_model.appendRow([name, address, type_])
+
+    # ************************************************************************
+    # **************************** Handlers **********************************
+    # ************************************************************************
+    def _module_clicked(self):
+        """ Module Clicked updates imports/exports/symbols
+        """
+        module_index = self.modules_list.selectionModel().currentIndex().row()
+        module = self.modules_model.item(module_index, 0)  # module name
+        imports = self._app_window.dwarf.dwarf_api('enumerateImports',
+                                                   module.text())
+        if imports and (imports is not None):
+            imports = json.loads(imports)
+            if imports:
+                self.set_imports(imports)
+                self.imports_list.setVisible(True)
+            else:
+                self.imports_list.setVisible(False)
+
+        exports = self._app_window.dwarf.dwarf_api('enumerateExports',
+                                                   module.text())
+        if exports and exports is not None:
+            exports = json.loads(exports)
+            if exports:
+                self.set_exports(exports)
+                self.exports_list.setVisible(True)
+            else:
+                self.exports_list.setVisible(False)
+
+        symbols = self._app_window.dwarf.dwarf_api('enumerateSymbols',
+                                                   module.text())
+        if symbols and symbols is not None:
+            symbols = json.loads(symbols)
+            if symbols:
+                self.set_symbols(symbols)
+                self.symbols_list.setVisible(True)
+            else:
+                self.symbols_list.setVisible(False)
+
+    def _module_dblclicked(self):
+        """ Module DoubleClicked
+        """
+        module_index = self.modules_list.selectionModel().currentIndex().row()
+        base = self.modules_model.item(module_index, 1).text()
+        size = self.modules_model.item(module_index, 2).text().replace(',', '')
+        self.onModuleSelected.emit([base, size])
+
+    def _import_dblclicked(self):
+        """ ImportFunction DoubleClicked
+        """
+        index = self.imports_list.selectionModel().currentIndex().row()
+        addr = self.imports_model.item(index, 1).text()
+        self.onModuleFuncSelected.emit(addr)
+
+    def _export_dblclicked(self):
+        """ ExportFunction DoubleClicked
+        """
+        index = self.exports_list.selectionModel().currentIndex().row()
+        addr = self.exports_model.item(index, 1).text()
+        self.onModuleFuncSelected.emit(addr)
+
+    def _symbol_dblclicked(self):
+        """ Symbol DoubleClicked
+        """
+        index = self.symbols_list.selectionModel().currentIndex().row()
+        addr = self.symbols_model.item(index, 1).text()
+        self.onModuleFuncSelected.emit(addr)
+
+    def _on_modules_contextmenu(self, pos):
+        """ Modules ContextMenu
+        """
+        index = self.modules_list.indexAt(pos).row()
+        glbl_pt = self.modules_list.mapToGlobal(pos)
+        context_menu = QMenu(self)
+        if index != -1:
+            context_menu.addAction(
+                'Dump Binary', lambda: self._on_dumpmodule(
+                    self.modules_model.item(index, 1).text(),
+                    self.modules_model.item(index, 2).text()))
+            context_menu.addAction(
+                'Copy Address', lambda: self._copy_address(
+                    self.modules_model.item(index, 1).text()))
+            context_menu.addSeparator()
+            context_menu.addAction(
+                'Copy Name', lambda: self._copy_str(
+                    self.modules_model.item(index, 0).text()))
+            context_menu.addAction(
+                'Copy Path', lambda: self._copy_str(
+                    self.modules_model.item(index, 3).text()))
+            context_menu.addSeparator()
+
+        context_menu.addAction('Refresh', self.update_modules)
+        context_menu.exec_(glbl_pt)
+
+    def _on_imports_contextmenu(self, pos):
+        """ ImportList ContextMenu
+        """
+        index = self.imports_list.indexAt(pos).row()
+        if index != -1:
+            glbl_pt = self.imports_list.mapToGlobal(pos)
+            context_menu = QMenu(self)
+            func_name = self.imports_model.item(index, 0).text()
+            addr = self.imports_model.item(index, 1).text()
+            context_menu.addAction(
+                'Add Hook', lambda: self._add_hook(addr, func_name))
+            context_menu.addSeparator()
+            context_menu.addAction(
+                'Copy Address', lambda: self._copy_address(
+                    self.imports_model.item(index, 1).text()))
+            context_menu.addSeparator()
+            context_menu.addAction(
+                'Copy FunctionName', lambda: self._copy_str(func_name))
+            context_menu.addAction(
+                'Copy ModuleName', lambda: self._copy_str(
+                    self.imports_model.item(index, 2).text()))
+            context_menu.exec_(glbl_pt)
+
+    def _on_exports_contextmenu(self, pos):
+        """ ExportsList ContextMenu
+        """
+        index = self.exports_list.indexAt(pos).row()
+        if index != -1:
+            glbl_pt = self.exports_list.mapToGlobal(pos)
+            context_menu = QMenu(self)
+            func_name = self.exports_model.item(index, 0).text()
+            addr = self.exports_model.item(index, 1).text()
+            context_menu.addAction(
+                'Add Hook', lambda: self._add_hook(addr, func_name))
+            context_menu.addSeparator()
+            context_menu.addAction(
+                'Copy Address', lambda: self._copy_address(
+                    self.exports_model.item(index, 1).text()))
+            context_menu.addSeparator()
+            context_menu.addAction(
+                'Copy FunctionName', lambda: self._copy_str(func_name))
+            context_menu.exec_(glbl_pt)
+
+    def _on_dumpmodule(self, ptr, size):
+        """ MenuItem DumpBinary
+        """
+        if isinstance(ptr, int):
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+            ptr = str_fmt.format(ptr)
+
+        size = size.replace(',', '')
+        self.onDumpBinary.emit([ptr, size])
+
+    def _copy_address(self, data):
+        """ MenuItem Copy Address
+        """
+        if isinstance(data, str):
+            if data.startswith('0x'):
+                pyperclip.copy(data)
+        elif isinstance(data, int):
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+
+            pyperclip.copy(str_fmt.format(data))
+
+    def _copy_str(self, data):
+        """ CopyHelper
+        """
+        if isinstance(data, str):
+            pyperclip.copy(data)
+
+    def _add_hook(self, ptr, name=None):
+        """ MenuItem AddHook
+        """
+        if name is None:
+            name = ptr
+        if isinstance(ptr, str):
+            if ptr.startswith('0x') or ptr.startswith('#'):
+                self.onAddHook.emit([ptr, name])
+        elif isinstance(ptr, int):
+            str_fmt = '0x{0:x}'
+            self.onAddHook.emit(str_fmt.format([ptr, name]))
