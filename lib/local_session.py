@@ -11,8 +11,8 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
+from PyQt5.QtCore import Qt, QEvent
+from PyQt5.QtWidgets import QMenu, QAction, QFileDialog, QApplication
 
 from lib.core import Dwarf
 from lib.session import Session
@@ -87,13 +87,25 @@ class LocalSession(Session):
         super().stop()
 
     def start(self, args):
+        self.dwarf.onScriptDestroyed.connect(self.stop)
         if args.package is None:
-            #device_window = DeviceWindow('local')
             self._device_window.setModal(True)
             self._device_window.onSelectedProcess.connect(self.on_proc_selected)
             self._device_window.show()
         else:
-            print(args)
+            if not args.spawn:
+                print('* Trying to attach to {0}'.format(args.package))
+                ret_val = self.dwarf.attach(args.package, args.script)
+                if ret_val == 2:
+                    print('Failed to attach: use -sp to force spawn')
+                    self.stop()
+                    exit()
+            else:
+                print('* Trying to spawn {0}'.format(args.package))
+                ret_val = self.dwarf.spawn(args.package, args.script)
+                if ret_val != 0:
+                    print('-failed-')
+                    exit(ret_val)
 
     def on_proc_selected(self, pid):
         if pid:
@@ -101,7 +113,7 @@ class LocalSession(Session):
 
     def _on_proc_resume(self, tid=0):
         if tid == 0:
-            self._app_window.contexts_list_panel.setRowCount(0)
+            self._app_window.contexts_list_panel.clear()
             self._app_window.context_panel.setRowCount(0)
             # self._app_window.backtrace_panel.setRowCount(0)
             self._app_window.memory_panel.clear_panel()

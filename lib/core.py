@@ -14,6 +14,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
+import os
 import binascii
 import json
 from threading import Thread
@@ -56,10 +57,12 @@ class Dwarf(QObject):
     onSetRanges = pyqtSignal(list, name='onSetRanges')
     # modules
     onSetModules = pyqtSignal(list, name='onSetModules')
+    onHitOnLoad = pyqtSignal(list, name='onHitOnLoad')
     #
     onLogToConsole = pyqtSignal(str, name='onLogToConsole')
     onTraceData = pyqtSignal(str, name='onTraceData')
     onSetData = pyqtSignal(list, name='onSetData')
+    onThreadResumed = pyqtSignal(int, name='onThreadResumed')
 
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
@@ -197,7 +200,12 @@ class Dwarf(QObject):
         self.script.load()
 
         if script is not None:
-            self.dwarf_api('evaluateFunction', script)
+            user_script = ''
+            if os.path.exists(script):
+                with open(script, 'r') as script_file:
+                    user_script = script_file.read()
+
+                self.dwarf_api('evaluateFunction', user_script)
 
         self.onScriptLoaded.emit()
         # self.app_window.on_script_loaded()
@@ -216,6 +224,7 @@ class Dwarf(QObject):
         try:
             self.pid = self.device.spawn(package)
             self.process = self.device.attach(self.pid)
+            self.process.enable_jit()
             self._spawned = True
         except Exception as e:
             utils.show_message_box('Failed to spawn to %s' % package, str(e))
@@ -314,11 +323,11 @@ class Dwarf(QObject):
             self.loading_library = parts[1]
             str_fmt = ('Hook onload {0} @thread := {1}'.format(parts[1], parts[3]))
             self.log(str_fmt)
-            self.app_window.hooks_panel.hit_onload(parts[1], parts[2])
+            self.onHitOnLoad.emit([parts[1], parts[2]])
         elif cmd == 'release':
             if parts[1] in self.contexts:
                 del self.contexts[parts[1]]
-            self.app_window.on_tid_resumed(int(parts[1]))
+            self.onThreadResumed.emit(int(parts[1]))
         elif cmd == 'set_context':
             data = json.loads(parts[1])
             if 'context' in data:
@@ -371,7 +380,9 @@ class Dwarf(QObject):
             # todo
             pass
         elif cmd == 'update_modules':
-            self.onSetModules.emit(json.loads(parts[2]))
+            modules = json.loads(parts[2])
+            # todo update onloads bases
+            self.onSetModules.emit(modules)
         elif cmd == 'update_ranges':
             self.onSetRanges.emit(json.loads(parts[2]))
         elif cmd == 'watcher':

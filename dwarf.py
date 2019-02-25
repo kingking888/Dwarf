@@ -22,20 +22,20 @@ from PyQt5.QtWidgets import QApplication
 from ui.app import AppWindow
 
 
-
 def process_args():
     """ process commandline params
     """
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-s", "--script", action='store_true',
-                        help="an additional script to load with dwarf and frida js api")
+    parser.add_argument("-t", "--type", type=str, help="SessionType - android, ios, local, remote - default: local")
 
-    parser.add_argument("-p", "--package",
-                        help="package name or pid")
+    parser.add_argument("-s", "--script", type=str,
+                        help="Path to an additional script to load with dwarf and frida js api")
 
-    parser.add_argument("-sp", "--spawn", action='store_true',
-                        help="force spawn")
+    parser.add_argument("-p", "--package", help="Attach Dwarf to given packagename")
+    #parser.add_argument("-a", "--attach", type=int, help="Attach Dwarf to given pid")
+
+    parser.add_argument("-sp", "--spawn", action='store_true', help="force spawn")
 
     args = parser.parse_args()
     return args

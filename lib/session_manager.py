@@ -45,12 +45,13 @@ class SessionManager(QObject):
             self.sessionCreated.emit()
 
     def create_session(self, session_type):
+        session_type = session_type.join(session_type.split()).lower()
         if self._session is not None:
             raise SessionRunningException('there is an active session')
         else:
-            if session_type == 'Android':
+            if session_type == 'android':
                 self._session = AndroidSession(self._app_window)
-            elif session_type == 'Local':
+            elif session_type == 'local':
                 self._session = LocalSession(self._app_window)
             else:
                 self._session = None

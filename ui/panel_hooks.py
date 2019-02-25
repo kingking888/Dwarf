@@ -160,8 +160,9 @@ class HooksPanel(TableBaseWidget):
         if self.app.dwarf.dwarf_api('setHookLogic', [what, inp[1]]):
             item.get_hook_data().set_logic(inp[1])
 
-    def hit_onload(self, module, base):
-        if module in self.app.get_dwarf().on_loads:
+    def hit_onload(self, data):
+        module, base = data
+        if module in self.app.dwarf.on_loads:
             items = self.findItems(module, Qt.MatchExactly)
             for item in items:
                 self.item(item.row(), 1).setText(base)

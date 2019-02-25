@@ -69,6 +69,7 @@ class AppWindow(QMainWindow):
         self.ranges_panel = None
         self.trace_panel = None
         self.watchers_panel = None
+        self.welcome_window = None
 
         self.setWindowTitle(
             'DWARF - A debugger for reverse engineers, crackers and security analyst'
@@ -180,8 +181,18 @@ class AppWindow(QMainWindow):
             self.hide()
             self.welcome_window.show()
         else:
-            # todo: bring args back
-            pass
+            if dwarf_args.package is not None:
+                if dwarf_args.type is None:
+                    # no device given check if package is local path
+                    if os.path.exists(dwarf_args.package):
+                        print('* Starting new LocalSession')
+                        self._start_session('local')
+                    else:
+                        print('use -t to set sessiontype')
+                        exit(0)
+                else:
+                    print('* Starting new Session')
+                    self._start_session(dwarf_args.type)
 
     def _setup_main_menu(self):
         self.menu = self.menuBar()
@@ -316,6 +327,8 @@ class AppWindow(QMainWindow):
             from ui.panel_contexts_list import ContextsListPanel
             self.threads_dock = QDockWidget('Threads', self)
             self.contexts_list_panel = ContextsListPanel(self)
+            self.dwarf.onThreadResumed.connect(self.contexts_list_panel.resume_tid)
+            self.contexts_list_panel.onItemDoubleClicked.connect(self._apply_context)
             self.threads_dock.setWidget(self.contexts_list_panel)
             self.addDockWidget(Qt.RightDockWidgetArea, self.threads_dock)
             self.view_menu.addAction(self.threads_dock.toggleViewAction())
@@ -452,7 +465,8 @@ class AppWindow(QMainWindow):
     # ************************************************************************
     # session handlers
     def _start_session(self, session_type):
-        self.welcome_window.close()
+        if self.welcome_window is not None:
+            self.welcome_window.close()
         self.session_manager.create_session(session_type)
 
     def session_created(self):
@@ -471,6 +485,7 @@ class AppWindow(QMainWindow):
         self.dwarf.onAddJavaHook.connect(self._on_add_javahook)
         self.dwarf.onAddNativeHook.connect(self._on_add_nativehook)
         self.dwarf.onAddOnLoadHook.connect(self._on_add_onloadhook)
+        self.dwarf.onHitOnLoad.connect(self.hooks_panel.hit_onload)
 
         self.dwarf.onTraceData.connect(self._on_tracer_data)
         self.dwarf.onSetData.connect(self._on_set_data)
@@ -525,9 +540,14 @@ class AppWindow(QMainWindow):
                 self.threads_dock = None
 
     def session_closed(self):
-        self.showNormal()
         self.hide()
-        self.welcome_window.show()
+        if self.welcome_window is not None:
+            self.welcome_window.show()
+
+        # close if it was a commandline session
+        if self.welcome_window is None:
+            if self.dwarf_args.package:
+                self.close()
         # self.app.session_ui.hide()
         # self.app.welcome_ui.show()
 
@@ -671,7 +691,7 @@ class AppWindow(QMainWindow):
             # if self.get_java_explorer_panel() is not None:
             #    self.get_java_explorer_panel().clear_panel()
 
-        self.contexts_list_panel.resume_tid(tid)
+        # self.contexts_list_panel.resume_tid(tid)
 
     def _on_tracer_data(self, data):
         if not data:

@@ -14,18 +14,97 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QStandardItem, QStandardItemModel
+from PyQt5.QtWidgets import QTreeView, QHeaderView, QMenu
 
-from ui.ui_session import SessionUi
-from ui.widget_context import ContextItem
-from ui.widget_item_not_editable import NotEditableTableWidgetItem
-from ui.widget_memory_address import MemoryAddressWidget
-from ui.widget_table_base import TableBaseWidget
+from ui.list_view import DwarfListView
 
 
+class ContextsListPanel(DwarfListView):
+
+    onItemDoubleClicked = pyqtSignal(dict, name='onItemDoubleClicked')
+
+    def __init__(self, parent=None):
+        super(ContextsListPanel, self).__init__(parent=parent)
+        self.dwarf = parent.dwarf
+
+        self.threads_model = QStandardItemModel(0, 3)
+        self.threads_model.setHeaderData(0, Qt.Horizontal, 'TID')
+        self.threads_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.threads_model.setHeaderData(1, Qt.Horizontal, 'PC')
+        self.threads_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
+                                         Qt.TextAlignmentRole)
+        self.threads_model.setHeaderData(2, Qt.Horizontal, 'Symbol')
+
+        self.setModel(self.threads_model)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.header().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+
+        self.doubleClicked.connect(self._item_doubleclicked)
+
+    def add_context(self, data, library_onload=None):
+        is_java = data['is_java']
+        tid = QStandardItem()
+        tid.setText(str(data['tid']))
+        tid.setData(data, Qt.UserRole + 1)
+        tid.setTextAlignment(Qt.AlignCenter)
+
+        pc_col = QStandardItem()
+        if not is_java:
+            pc = int(data['ptr'], 16)
+            if 'arm' in self.dwarf.arch:
+                # dethumbify
+                if pc & 1 == 1:
+                    pc -= 1
+
+            str_fmt = '0x{0:X}'
+            if self._uppercase_hex:
+                str_fmt = '0x{0:X}'
+            else:
+                str_fmt = '0x{0:x}'
+
+            pc_col.setText(str_fmt.format(pc))
+        else:
+            parts = data['ptr'].split('.')
+            pc_col.setText(parts[len(parts) - 1])
+
+        symb_col = QStandardItem()
+        if library_onload is None:
+            if not is_java:
+                str_fmt = ('{0} - {1}'.format(data['context']['pc']['symbol']['moduleName'], data['context']['pc']['symbol']['name']))
+                symb_col.setText(str_fmt)
+            else:
+                symb_col.setText('.'.join(parts[:len(parts) - 1]))
+        else:
+            str_fmt = ('loading {0}'.format(library_onload))
+            symb_col.setText(str_fmt)
+
+        self.threads_model.appendRow([tid, pc_col, symb_col])
+
+    def resume_tid(self, tid):
+        # todo: check why removing here and removing in on_proc_resume
+        for i in range(self.threads_model.rowCount()):
+            is_tid = self.threads_model.item(i, 0).text()
+            if is_tid == str(tid):
+                self.threads_model.removeRow(i)
+
+    def _item_doubleclicked(self, model_index):
+        row = self.threads_model.itemFromIndex(model_index).row()
+        if row != -1:
+            context_data = self.threads_model.item(row, 0).data(Qt.UserRole + 1)
+            self.onItemDoubleClicked.emit(context_data)
+
+    #self.dwarf_api('release', tid)
+
+
+"""
 class ContextsListPanel(TableBaseWidget):
     def __init__(self, app, *__args):
         super().__init__(app, 0, 0)
+        
 
     def set_menu_actions(self, item, menu):
         if item is not None:
@@ -117,3 +196,4 @@ class ContextsListPanel(TableBaseWidget):
         self.setColumnCount(0)
         self.resizeColumnsToContents()
         self.horizontalHeader().setStretchLastSection(True)
+"""

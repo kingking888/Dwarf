@@ -22,6 +22,8 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QHeaderView, QMenu
 
+from ui.list_view import DwarfListView
+
 
 class ModulesPanel(QWidget):
     """ ModulesPanel
@@ -93,10 +95,7 @@ class ModulesPanel(QWidget):
         main_wrapper = QVBoxLayout()
         main_wrapper.setContentsMargins(0, 0, 0, 0)
         h_box = QHBoxLayout()
-        self.modules_list = QTreeView()
-        self.modules_list.setHeaderHidden(False)
-        self.modules_list.setRootIsDecorated(False)
-        self.modules_list.setAutoFillBackground(True)
+        self.modules_list = DwarfListView()
         self.modules_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.modules_list.customContextMenuRequested.connect(
             self._on_modules_contextmenu)
@@ -113,10 +112,7 @@ class ModulesPanel(QWidget):
         h_box.addWidget(self.modules_list)
 
         hv_box = QVBoxLayout()
-        self.imports_list = QTreeView()
-        self.imports_list.setHeaderHidden(False)
-        self.imports_list.setRootIsDecorated(False)
-        self.imports_list.setAutoFillBackground(True)
+        self.imports_list = DwarfListView()
         self.imports_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.imports_list.customContextMenuRequested.connect(
             self._on_imports_contextmenu)
@@ -130,10 +126,7 @@ class ModulesPanel(QWidget):
         self.imports_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
         self.imports_list.setVisible(False)
-        self.exports_list = QTreeView()
-        self.exports_list.setHeaderHidden(False)
-        self.exports_list.setRootIsDecorated(False)
-        self.exports_list.setAutoFillBackground(True)
+        self.exports_list = DwarfListView()
         self.exports_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.exports_list.customContextMenuRequested.connect(
             self._on_exports_contextmenu)
@@ -147,11 +140,7 @@ class ModulesPanel(QWidget):
         self.exports_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
         self.exports_list.setVisible(False)
-        self.symbols_list = QTreeView()
-        self.symbols_list.setHeaderHidden(False)
-        self.symbols_list.setRootIsDecorated(False)
-        self.symbols_list.setAlternatingRowColors(True)
-        self.symbols_list.setAutoFillBackground(True)
+        self.symbols_list = DwarfListView()
         self.symbols_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self.symbols_list.doubleClicked.connect(self._symbol_dblclicked)
         self.symbols_list.setModel(self.symbols_model)
@@ -214,7 +203,7 @@ class ModulesPanel(QWidget):
     def set_modules(self, modules):
         """ Fills the ModulesList with data
         """
-        self.modules_model.removeRows(0, self.modules_model.rowCount())
+        self.modules_list.clear()
         for module in modules:
             name = QStandardItem()
             name.setTextAlignment(Qt.AlignLeft)
@@ -247,7 +236,7 @@ class ModulesPanel(QWidget):
     def set_imports(self, imports):
         """ Fills the ImportsList with data
         """
-        self.imports_model.removeRows(0, self.imports_model.rowCount())
+        self.imports_list.clear()
         for import_ in imports:
             name = QStandardItem(0)
             name.setTextAlignment(Qt.AlignLeft)
@@ -275,7 +264,7 @@ class ModulesPanel(QWidget):
     def set_exports(self, exports):
         """ Fills the ExportsList with data
         """
-        self.exports_model.removeRows(0, self.exports_model.rowCount())
+        self.exports_list.clear()
         for export in exports:
             name = QStandardItem(0)
             name.setTextAlignment(Qt.AlignLeft)
@@ -297,7 +286,7 @@ class ModulesPanel(QWidget):
     def set_symbols(self, symbols):
         """ Fills the SymbolsList with data
         """
-        self.symbols_model.removeRows(0, self.symbols_model.rowCount())
+        self.symbols_list.clear()
         for symbol in symbols:
             name = QStandardItem(0)
             name.setTextAlignment(Qt.AlignLeft)
