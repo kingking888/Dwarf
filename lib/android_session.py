@@ -146,24 +146,15 @@ class AndroidSession(Session):
 
     def save_apk(self):
         apk_dlg = ApkListDialog(self._app_window)
+        apk_dlg.onApkSelected.connect(self._save_package)
         apk_dlg.show()
-        return
-        packages = self.adb.list_packages()
-        if packages:
-            accept, items = ListDialog.build_and_show(
-                self.build_packages_list,
-                packages,
-                double_click_to_accept=True)
-            if accept:
-                if len(items) > 0:
-                    path = items[0].get_apk_path()
-                    r = QFileDialog.getSaveFileName()
-                    if len(r) > 0 and len(r[0]) > 0:
-                        self.adb.pull(path, r[0])
 
-    def build_packages_list(self, list, data):
-        for ap in sorted(data, key=lambda x: x.package):
-            list.add_item(AndroidPackageWidget(ap.package, ap.package, 0, apk_path=ap.path))
+    def _save_package(self, data):
+        package, path = data
+        if path is not None:
+            result = QFileDialog.getSaveFileName(caption='Location to save ' + package, directory='./' + package + '.apk', filter='*.apk')
+            if result and result[0]:
+                self.adb.pull(path, result[0])
 
     def on_proc_selected(self, pid):
         if pid:

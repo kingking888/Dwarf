@@ -28,7 +28,9 @@ class ApkListDialog(QDialog):
     """ Dialog that shows installed apks and allows install
     """
 
-    def __init__(self, parent=None, show_paths=False, show_install=False):
+    onApkSelected = pyqtSignal(list, name='onApkSelected')
+
+    def __init__(self, parent=None, show_paths=True, show_install=False):
         super(ApkListDialog, self).__init__(parent=parent)
         self.setWindowTitle('Packages')
 
@@ -45,6 +47,7 @@ class ApkListDialog(QDialog):
 
         self.apklist = ApkList(self, show_paths)
         self.apklist.retrieve_thread.onFinished.connect(self._on_finished)
+        self.apklist.onApkSelected.connect(self._on_apkselected)
         self.refresh_button = QPushButton('Refresh')
         self.refresh_button.clicked.connect(self._on_refresh)
         v_box.addWidget(self.apklist)
@@ -62,6 +65,7 @@ class ApkListDialog(QDialog):
     def _on_install(self):
         if self.file_path.text() is '':
             file_path = QFileDialog.getOpenFileName(self, 'Select an apk to install', QDir.currentPath(), '*.apk')
+            self.file_path.setText(file_path)
 
         if os.path.exists(self.file_path.text()):
             self.apklist.adb.install(file_path)
@@ -72,6 +76,10 @@ class ApkListDialog(QDialog):
 
     def _on_finished(self):
         self.refresh_button.setEnabled(True)
+
+    def _on_apkselected(self, data):
+        self.close()
+        self.onApkSelected.emit(data)
 
 
 class PackageRetrieveThread(QThread):
@@ -103,6 +111,8 @@ class ApkList(DwarfListView):
     """ Displays installed APKs
     """
 
+    onApkSelected = pyqtSignal(list, name='onApkSelected')
+
     def __init__(self, parent=None, show_path=True):
         super(ApkList, self).__init__(parent=parent)
 
@@ -126,6 +136,8 @@ class ApkList(DwarfListView):
             self.apk_model.setHeaderData(1, Qt.Horizontal, 'Path')
 
         self.setModel(self.apk_model)
+
+        self.doubleClicked.connect(self._on_apk_selected)
 
         if self.retrieve_thread is not None:
             if not self.retrieve_thread.isRunning():
@@ -157,3 +169,13 @@ class ApkList(DwarfListView):
                 self.apk_model.appendRow([name, path])
             else:
                 self.apk_model.appendRow([name])
+
+    def _on_apk_selected(self, model_index):
+        item = self.apk_model.itemFromIndex(model_index).row()
+        if item != -1:
+            package = self.apk_model.item(item, 0).text()
+            if self.apk_model.columnCount() == 2:
+                path = self.apk_model.item(item, 1).text()
+                self.onApkSelected.emit([package, path])
+            else:
+                self.onApkSelected.emit([package, None])

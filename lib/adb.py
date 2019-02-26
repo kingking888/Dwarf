@@ -248,6 +248,7 @@ class Adb(object):
             p = AndroidPackage()
             p.path = needed[0] + '.apk'
             p.package = needed[1]
+            p.package = p.package.join(p.package.split())
             ret.append(p)
         return ret
 
