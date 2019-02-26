@@ -127,12 +127,15 @@ class DeviceWindow(QDialog):
         super(DeviceWindow, self).__init__(parent=parent)
         self.setModal(True)
 
-        if device == 'local':
-            self.device = frida.get_local_device()
-        elif device == 'usb':
-            self.device = frida.get_usb_device()
-        else:
-            self.device = frida.get_local_device()
+        try:
+            if device == 'local':
+                self.device = frida.get_local_device()
+            elif device == 'usb':
+                self.device = frida.get_usb_device()
+            else:
+                self.device = frida.get_local_device()
+        except frida.TimedOutError:
+            print('Frida TimedOutError: No Device')
 
         self.updated_frida_version = ''
         self.updated_frida_assets_url = {}

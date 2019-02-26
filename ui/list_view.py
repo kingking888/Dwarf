@@ -62,32 +62,35 @@ class DwarfListView(QTreeView):
         """
         # delete entries but not headerdata
         model = self.model()
-        model.removeRows(0, model.rowCount())
+        if model is not None:
+            model.removeRows(0, model.rowCount())
 
     def get_item(self, index):
         """ Returns [] with col_texts
         """
-        item_data = []
-        if index < self.model().rowCount():
-            for i in range(self.model().columnCount()):
-                item_text = self.model().item(index, i).text()
-                if item_text:
-                    item_data.append(item_text)
-                else:
-                    item_data.append('')
+        if self.model() is not None:
+            item_data = []
+            if index < self.model().rowCount():
+                for i in range(self.model().columnCount()):
+                    item_text = self.model().item(index, i).text()
+                    if item_text:
+                        item_data.append(item_text)
+                    else:
+                        item_data.append('')
 
-            return item_data
-        else:
-            return None
+                return item_data
+            else:
+                return None
 
     def get_item_text(self, index, col):
         """ returns text in index, col
         """
-        if index < self.model().rowCount():
-            if col < self.model().columnCount():
-                item = self.model().item(index, col)
-                if isinstance(item, QStandardItem):
-                    return self.model().item(index, col).text()
+        if self.model() is not None:
+            if index < self.model().rowCount():
+                if col < self.model().columnCount():
+                    item = self.model().item(index, col)
+                    if isinstance(item, QStandardItem):
+                        return self.model().item(index, col).text()
 
         return None
 
@@ -95,32 +98,45 @@ class DwarfListView(QTreeView):
         """ looks in all fields for text
             returns true if text exists
         """
-        for i in range(self.model().rowCount()):
-            for j in range(self.model().columnCount()):
-                item_text = self.get_item_text(i, j)
-                if case_sensitive and (item_text == text):
-                    return True
-                elif not case_sensitive and (item_text.lower() == text.lower()):
-                    return True
+        if self.model() is not None:
+            for i in range(self.model().rowCount()):
+                for j in range(self.model().columnCount()):
+                    item_text = self.get_item_text(i, j)
+                    if case_sensitive and (item_text == text):
+                        return True
+                    elif not case_sensitive and (item_text.lower() == text.lower()):
+                        return True
 
         return False
 
     def number_of_items(self):
         """ returns number of rows
         """
-        return self.model().rowCount()
+        if self.model() is not None:
+            return self.model().rowCount()
+        else:
+            return None
 
     def number_of_rows(self):
         """ returns number of rows
         """
-        return self.number_of_items()
+        if self.model() is not None:
+            return self.number_of_items()
+        else:
+            return None
 
     def number_of_total(self):
         """ returns number of all fields rows+cols
         """
-        return self.model().rowCount() + self.model().columnCount()
+        if self.model() is not None:
+            return self.model().rowCount() + self.model().columnCount()
+        else:
+            return None
 
     def number_of_cols(self):
         """ returns number of cols
         """
-        return self.model().columnCount()
+        if self.model() is not None:
+            return self.model().columnCount()
+        else:
+            return None

@@ -20,15 +20,29 @@ from lib.adb import Adb
 from ui.dialog_list import ListDialog
 from ui.dialog_input import InputDialog
 
+from ui.widget_android_package import AndroidPackageWidget
+from ui.widget_item_not_editable import NotEditableListWidgetItem
+
+from ui.device_window import DeviceWindow
+from ui.apk_list import ApkListDialog
+
 
 class AndroidSession(Session):
     """ All Android Stuff goes here
         if u look for something android related its here then
     """
 
-    def __init__(self):
-        super(AndroidSession, self).__init__()
+    def __init__(self, app_window):
+        super(AndroidSession, self).__init__(app_window)
+        self._app_window = app_window
+
         self.adb = Adb()
+        if not self.adb.is_available():
+            print('No ADB available')
+            return
+
+        self._device_window = DeviceWindow(self._app_window, 'usb')
+
         # main menu every session needs
         self._menu = [QMenu(self.session_type + ' Session')]
         #self._menu[0].addAction('Save Session', self._save_session)
@@ -46,7 +60,7 @@ class AndroidSession(Session):
     @property
     def session_ui_sections(self):
         # what sections we want in session_ui
-        return ['registers', 'memory', 'threads', 'console', 'watchers', 'hooks']
+        return ['hooks', 'threads', 'registers', 'memory', 'console', 'watchers']
 
     @property
     def session_type(self):
@@ -76,7 +90,7 @@ class AndroidSession(Session):
         """ Build Menus
         """
         # additional menus
-        file_menu = QMenu('&File')
+        file_menu = QMenu('&Device')
         save_apk = QAction("&Save APK", self)
         save_apk.triggered.connect(self.save_apk)
         decompile_apk = QAction("&Decompile APK", self)
@@ -88,17 +102,35 @@ class AndroidSession(Session):
         self._menu.append(file_menu)
 
         # additional menus
-        device_menu = QMenu('&Device')
-        self._menu.append(device_menu)
+        #device_menu = QMenu('&Device')
+        # self._menu.append(device_menu)
 
     def stop_session(self):
         # cleanup ur stuff
 
         # end session
-        super().stop_session()
+        super().stop()
 
     def start(self, args):
-        print(args)
+        self.dwarf.onScriptDestroyed.connect(self.stop)
+        if args.package is None:
+            self._device_window.setModal(True)
+            self._device_window.onSelectedProcess.connect(self.on_proc_selected)
+            self._device_window.show()
+        else:
+            if not args.spawn:
+                print('* Trying to attach to {0}'.format(args.package))
+                ret_val = self.dwarf.attach(args.package, args.script)
+                if ret_val == 2:
+                    print('Failed to attach: use -sp to force spawn')
+                    self.stop()
+                    exit()
+            else:
+                print('* Trying to spawn {0}'.format(args.package))
+                ret_val = self.dwarf.spawn(args.package, args.script)
+                if ret_val != 0:
+                    print('-failed-')
+                    exit(ret_val)
 
     def decompile_apk(self):
         packages = self.adb.list_packages()
@@ -113,6 +145,9 @@ class AndroidSession(Session):
                     AndroidDecompileUtil.decompile(self.adb, path)
 
     def save_apk(self):
+        apk_dlg = ApkListDialog(self._app_window)
+        apk_dlg.show()
+        return
         packages = self.adb.list_packages()
         if packages:
             accept, items = ListDialog.build_and_show(
@@ -125,3 +160,11 @@ class AndroidSession(Session):
                     r = QFileDialog.getSaveFileName()
                     if len(r) > 0 and len(r[0]) > 0:
                         self.adb.pull(path, r[0])
+
+    def build_packages_list(self, list, data):
+        for ap in sorted(data, key=lambda x: x.package):
+            list.add_item(AndroidPackageWidget(ap.package, ap.package, 0, apk_path=ap.path))
+
+    def on_proc_selected(self, pid):
+        if pid:
+            self.dwarf.attach(pid)

@@ -110,6 +110,7 @@ class ModulesPanel(QWidget):
         self.modules_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
         h_box.addWidget(self.modules_list)
+        self.modules_list.selectionModel().selectionChanged.connect(self._module_clicked)
 
         hv_box = QVBoxLayout()
         self.imports_list = DwarfListView()
@@ -217,11 +218,11 @@ class ModulesPanel(QWidget):
         """
         self.imports_list.clear()
         for import_ in imports:
-            name = QStandardItem(0)
+            name = QStandardItem()
             name.setTextAlignment(Qt.AlignLeft)
             name.setText(import_['name'])
 
-            address = QStandardItem(1)
+            address = QStandardItem()
             address.setTextAlignment(Qt.AlignCenter)
 
             str_fmt = '0x{0:X}'
@@ -230,13 +231,15 @@ class ModulesPanel(QWidget):
 
             address.setText(str_fmt.format(int(import_['address'], 16)))
 
-            module = QStandardItem(2)
-            module.setTextAlignment(Qt.AlignLeft)
-            module.setText(import_['module'])
+            module = QStandardItem()
+            if 'module' in import_:
+                module.setTextAlignment(Qt.AlignLeft)
+                module.setText(import_['module'])
 
-            type_ = QStandardItem(2)
-            type_.setTextAlignment(Qt.AlignLeft)
-            type_.setText(import_['type'])
+            type_ = QStandardItem()
+            if 'type' in import_:
+                type_.setTextAlignment(Qt.AlignLeft)
+                type_.setText(import_['type'])
 
             self.imports_model.appendRow([name, address, module, type_])
 
@@ -245,18 +248,18 @@ class ModulesPanel(QWidget):
         """
         self.exports_list.clear()
         for export in exports:
-            name = QStandardItem(0)
+            name = QStandardItem()
             name.setTextAlignment(Qt.AlignLeft)
             name.setText(export['name'])
 
-            address = QStandardItem(1)
+            address = QStandardItem()
             address.setTextAlignment(Qt.AlignCenter)
             str_fmt = '0x{0:X}'
             if not self.uppercase_hex:
                 str_fmt = '0x{0:x}'
             address.setText(str_fmt.format(int(export['address'], 16)))
 
-            type_ = QStandardItem(2)
+            type_ = QStandardItem()
             type_.setTextAlignment(Qt.AlignLeft)
             type_.setText(export['type'])
 
@@ -267,18 +270,18 @@ class ModulesPanel(QWidget):
         """
         self.symbols_list.clear()
         for symbol in symbols:
-            name = QStandardItem(0)
+            name = QStandardItem()
             name.setTextAlignment(Qt.AlignLeft)
             name.setText(symbol['name'])
 
-            address = QStandardItem(1)
+            address = QStandardItem()
             address.setTextAlignment(Qt.AlignCenter)
             str_fmt = '0x{0:X}'
             if not self.uppercase_hex:
                 str_fmt = '0x{0:x}'
             address.setText(str_fmt.format(int(symbol['address'], 16)))
 
-            type_ = QStandardItem(2)
+            type_ = QStandardItem()
             type_.setTextAlignment(Qt.AlignLeft)
             type_.setText(symbol['type'])
 
