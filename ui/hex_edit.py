@@ -1166,7 +1166,6 @@ class HexEditor(QAbstractScrollArea):
         # scroll to new pos if needed
         line = self.index_to_line(self.caret.position)
         scroll_y = self.verticalScrollBar().value()
-        #print('{0} {1}'.format(line, scroll_y))
         if line >= (scroll_y + self.visible_lines()):
             self.verticalScrollBar().setValue(line -
                                               (self.visible_lines() - 1))

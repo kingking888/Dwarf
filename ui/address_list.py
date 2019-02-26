@@ -131,7 +131,6 @@ class AddressListWidget(QWidget):
     def _copy_address(self):
         data = self.list_view.model().data(self.list_view.currentIndex())
         pyperclip.copy(data)
-        print(data)
 
     def _on_item_dblclick(self, model_index):
         data = self.list_view.model().data(model_index)

@@ -506,10 +506,7 @@ class Dwarf(QObject):
             except:
                 return
         self.native_traced_tid = tid
-        self.dwarf_api('startNativeTracer', [tid, True])
-        if self.app_window.trace_panel is None:
-            self.app.get_session_ui().add_dwarf_tab('trace', request_focus=True)
-        self.app_window.get_menu().on_native_tracer_change(True)
+        return self.dwarf_api('startNativeTracer', [tid, True])
 
     def native_tracer_stop(self):
         if self.native_traced_tid == 0:
@@ -518,7 +515,7 @@ class Dwarf(QObject):
         if self.app_window.trace_panel is not None:
             self.app_window.trace_panel.stop()
         self.native_traced_tid = 0
-        self.app_window.get_menu().on_native_tracer_change(False)
+        # self.app_window.get_menu().on_native_tracer_change(False)
 
     def read_memory(self, ptr, len):
         if len > 1024 * 1024:

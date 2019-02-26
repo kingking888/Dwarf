@@ -486,6 +486,7 @@ class AppWindow(QMainWindow):
         self.dwarf.onAddNativeHook.connect(self._on_add_nativehook)
         self.dwarf.onAddOnLoadHook.connect(self._on_add_onloadhook)
         self.dwarf.onHitOnLoad.connect(self.hooks_panel.hit_onload)
+        self.dwarf.onThreadResumed.connect(self.on_tid_resumed)
 
         self.dwarf.onTraceData.connect(self._on_tracer_data)
         self.dwarf.onSetData.connect(self._on_set_data)

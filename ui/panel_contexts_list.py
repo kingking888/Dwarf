@@ -42,6 +42,8 @@ class ContextsListPanel(DwarfListView):
         self.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.header().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self._on_context_menu)
 
         self.doubleClicked.connect(self._item_doubleclicked)
 
@@ -97,7 +99,23 @@ class ContextsListPanel(DwarfListView):
             context_data = self.threads_model.item(row, 0).data(Qt.UserRole + 1)
             self.onItemDoubleClicked.emit(context_data)
 
-    #self.dwarf_api('release', tid)
+    def _on_context_menu(self, pos):
+        index = self.indexAt(pos).row()
+        if index != -1:
+            tid = int(self.get_item_text(index, 0))
+            glbl_pt = self.mapToGlobal(pos)
+            context_menu = QMenu()
+            context_menu.addAction('Emulator')
+            if self.dwarf.get_native_traced_tid() == tid:
+                context_menu.addAction('Stop Trace', self.dwarf.native_tracer_stop)
+            else:
+                context_menu.addAction('Trace', lambda: self._on_cm_starttrace(tid))
+            context_menu.addSeparator()
+            context_menu.addAction('Resume', lambda: self.dwarf.dwarf_api('release', tid))
+            context_menu.exec_(glbl_pt)
+
+    def _on_cm_starttrace(self, tid):
+        self.dwarf.native_tracer_start(int(tid))
 
 
 """
