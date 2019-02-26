@@ -17,6 +17,8 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
 from PyQt5.QtWidgets import QTreeView, QHeaderView
 
+from lib.prefs import Prefs
+
 
 class DwarfListView(QTreeView):
     """ Using QTreeView as ListView because it allows ListView+QHeaderView
@@ -25,7 +27,8 @@ class DwarfListView(QTreeView):
     def __init__(self, parent=None):
         super(DwarfListView, self).__init__(parent=parent)
 
-        self._uppercase_hex = True
+        _prefs = Prefs()
+        self.rows_dualcolor = _prefs.get('dwarf_ui_alternaterowcolors', False)
 
         self.setEditTriggers(self.NoEditTriggers)
         self.setHeaderHidden(False)

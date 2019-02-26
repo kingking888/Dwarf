@@ -1,4 +1,19 @@
+"""
+Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
+"""
 import frida
 import requests
 
@@ -11,7 +26,7 @@ from ui.list_pick import PickList
 from ui.widget_android_package import AndroidPackageWidget
 from ui.widget_item_not_editable import NotEditableListWidgetItem
 
-from ui.processes_widget import ProcessesWidget
+from ui.processes_widget import ProcessList
 
 
 class DevicesUpdateThread(QThread):
@@ -46,45 +61,6 @@ class DevicesUpdateThread(QThread):
             self.add_device.emit(device_string, device.id, device.type == 'usb')
 
         self.devices_updated.emit()
-
-
-class ProcsThread(QThread):
-    """ Updates Processlist
-        signals:
-            clear_proc()
-            add_proc(NotEditableListWidgetItem)
-            is_error(str) - shows str in statusbar
-        device must set before run
-    """
-    clear_procs = pyqtSignal()
-    add_proc = pyqtSignal(dict)
-    is_error = pyqtSignal(str)
-
-    def __init__(self, parent=None, device=None):
-        super().__init__(parent)
-        self.device = device
-
-    def run(self):
-        self.clear_procs.emit()
-
-        if self.device is not None:
-            try:
-                procs = self.device.enumerate_processes()
-
-                for proc in procs:
-                    proc_item = {'pid': proc.pid, 'name': proc.name}
-                    self.add_proc.emit(proc_item)
-            # ServerNotRunningError('unable to connect to remote frida-server: closed')
-            except frida.ServerNotRunningError:
-                self.is_error.emit('unable to connect to remote frida server: not started')
-            except frida.TransportError:
-                self.is_error.emit('unable to connect to remote frida server: closed')
-            except frida.TimedOutError:
-                self.is_error.emit('unable to connect to remote frida server: timedout')
-            except Exception:
-                self.is_error.emit('something was wrong...')
-
-        self.device = None
 
 
 class SpawnsThread(QThread):
@@ -196,13 +172,13 @@ class DeviceWindow(QDialog):
 
         #self.proc_list = PickList(self.on_proc_picked)
         #devices = frida.enumerate_devices()
-        self.proc_list = ProcessesWidget(device=self.device)
-        self.proc_list.onPIDSelected.connect(self._pid_selected)
+        self.proc_list = ProcessList(device=self.device)
+        self.proc_list.onProcessSelected.connect(self._pid_selected)
         procs_vbox.addWidget(self.proc_list)
 
-        procs_refresh_button = QPushButton('refresh')
-        procs_refresh_button.clicked.connect(self.on_refresh_procs)
-        procs_vbox.addWidget(procs_refresh_button)
+        #procs_refresh_button = QPushButton('refresh')
+        # procs_refresh_button.clicked.connect(self.on_refresh_procs)
+        # procs_vbox.addWidget(procs_refresh_button)
 
         inner_hbox = QHBoxLayout()
         inner_hbox.addLayout(spawns_vbox)
@@ -212,8 +188,6 @@ class DeviceWindow(QDialog):
     # onshow start thread
     def showEvent(self, QShowEvent):
         super().showEvent(QShowEvent)
-        if not self.procs_update_thread.isRunning():
-            self.procs_update_thread.start()
 
     def setup_threads(self):
         """ Setups the Threads used here
@@ -233,41 +207,10 @@ class DeviceWindow(QDialog):
             self.spawns_update_thread.clear_spawns.connect(self.on_clear_spawnlist)
             self.spawns_update_thread.is_error.connect(self.on_status_text)"""
 
-        if self.procs_update_thread is None:
-            self.procs_update_thread = ProcsThread(self, self.device)
-            self.procs_update_thread.add_proc.connect(self.on_add_proc)
-            self.procs_update_thread.clear_procs.connect(self.on_clear_proclist)
-            self.procs_update_thread.device = self.device
-            # self.procs_update_thread.is_error.connect(self.on_status_text)
-
     def _pid_selected(self, pid):
         if pid:
-            self.onSelectedProcess.emit(pid)
+            self.onSelectedProcess.emit(pid[0])
             self.accept()
-
-    def on_refresh_procs(self):
-        self.on_clear_proclist()
-        try:
-            self.update_proc_list(self.device)
-        except Exception:
-            return
-
-    def on_clear_proclist(self):
-        """ Clears the ProcList
-        """
-        self.proc_list.clear()
-
-    def on_add_proc(self, item):
-        self.proc_list.add_item(item)
-
-    def update_proc_list(self, device):
-        if not device:
-            return
-
-        if self.procs_update_thread is not None:
-            if not self.procs_update_thread.isRunning():
-                self.procs_update_thread.device = device
-                self.procs_update_thread.start()
 
     def on_proc_picked(self, widget_android_package):
         editor = JsEditorDialog(self.app, def_text=self.startup_script,
