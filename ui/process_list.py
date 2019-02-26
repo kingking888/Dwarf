@@ -25,10 +25,12 @@ from ui.list_view import DwarfListView
 
 class ProcsThread(QThread):
     """ Updates Processlist
-        signals:
-            clear_proc()
-            add_proc(NotEditableListWidgetItem)
-            is_error(str) - shows str in statusbar
+
+        Signals:
+            add_proc(dict)
+            is_error(str)
+            is_finished()
+
         device must set before run
     """
     add_proc = pyqtSignal(dict)
@@ -53,12 +55,13 @@ class ProcsThread(QThread):
                         self.add_proc.emit(proc_item)
                 # ServerNotRunningError('unable to connect to remote frida-server: closed')
                 except frida.ServerNotRunningError:
-                    self.is_error.emit('unable to connect to remote frida server: not started')
+                    self.is_error.emit(
+                        'Frida ServerNotRunningError: Server not running')
                 except frida.TransportError:
-                    self.is_error.emit('unable to connect to remote frida server: closed')
+                    self.is_error.emit('Frida TransportError: Server closed')
                 except frida.TimedOutError:
-                    self.is_error.emit('unable to connect to remote frida server: timedout')
-                except Exception:
+                    self.is_error.emit('Frida TimedOutError: Server timedout')
+                except Exception:  # pylint: disable=broad-except
                     self.is_error.emit('something was wrong...')
 
         self.is_finished.emit()
@@ -66,6 +69,7 @@ class ProcsThread(QThread):
 
 class ProcessList(QWidget):
     """ ProcessListWidget wich shows running Processes on Device
+        Includes a Refresh Button to manually start refreshthread
 
         args:
             device needed
@@ -82,6 +86,7 @@ class ProcessList(QWidget):
         super(ProcessList, self).__init__(parent=parent)
 
         if not isinstance(device, frida.core.Device):
+            print('No FridaDevice')
             return
 
         self._device = device
@@ -90,7 +95,8 @@ class ProcessList(QWidget):
 
         model = QStandardItemModel(0, 2, parent)
         model.setHeaderData(0, Qt.Horizontal, "PID")
-        model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+        model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
+                            Qt.TextAlignmentRole)
         model.setHeaderData(1, Qt.Horizontal, "Name")
 
         self.process_list.doubleClicked.connect(self._on_item_clicked)
@@ -105,7 +111,8 @@ class ProcessList(QWidget):
         self.setLayout(v_box)
 
         self.process_list.setModel(model)
-        self.process_list.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.process_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
 
         self.procs_update_thread = ProcsThread(self, self._device)
         self.procs_update_thread.add_proc.connect(self._on_add_proc)
@@ -162,7 +169,6 @@ class ProcessList(QWidget):
         pid.setTextAlignment(Qt.AlignCenter)
         name = QStandardItem()
         name.setText(item['name'])
-
         model.appendRow([pid, name])
 
     def _on_error(self, error_str):

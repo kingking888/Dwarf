@@ -232,21 +232,6 @@ class WatchersPanel(QWidget):
         elif isinstance(value, str):
             self._uppercase_hex = (value == 'upper')
 
-    @property
-    def rows_dualcolor(self):
-        """ AlternatingRowColors
-        """
-        return self.list_view.alternatingRowColors()
-
-    @rows_dualcolor.setter
-    def rows_dualcolor(self, value):
-        """ AlternatingRowColors
-        """
-        if isinstance(value, bool):
-            self.list_view.setAlternatingRowColors(value)
-        elif isinstance(value, str):
-            self.list_view.setAlternatingRowColors(value == 'True')
-
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************

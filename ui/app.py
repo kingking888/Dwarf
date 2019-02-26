@@ -272,7 +272,6 @@ class AppWindow(QMainWindow):
             self.watchers_panel = WatchersPanel(self)
             self.watchers_panel.uppercase_hex = self.prefs.get(
                 'dwarf_ui_hexstyle', 'upper')
-            self.watchers_panel.rows_dualcolor = self.prefs.get('dwarf_ui_alternaterowcolors', False)
             # dont respond to dblclick mem cant be shown
             # self.watchers_panel.onItemDoubleClicked.connect(
             #    self._on_watcher_clicked)
@@ -337,7 +336,6 @@ class AppWindow(QMainWindow):
             self.modules_panel = ModulesPanel(self)
             self.modules_panel.uppercase_hex = self.prefs.get(
                 'dwarf_ui_hexstyle', 'upper')
-            self.modules_panel.rows_dualcolor = self.prefs.get('dwarf_ui_alternaterowcolors', False)
             self.modules_panel.onModuleSelected.connect(
                 self._on_module_dblclicked)
             self.modules_panel.onModuleFuncSelected.connect(
@@ -350,7 +348,6 @@ class AppWindow(QMainWindow):
             self.ranges_panel = RangesPanel(self)
             self.ranges_panel.uppercase_hex = self.prefs.get(
                 'dwarf_ui_hexstyle', 'upper')
-            self.ranges_panel.rows_dualcolor = self.prefs.get('dwarf_ui_alternaterowcolors', False)
             self.ranges_panel.onItemDoubleClicked.connect(self._range_dblclicked)
             self.ranges_panel.onDumpBinary.connect(self._on_dumpmodule)
             # connect to watcherpanel func

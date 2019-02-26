@@ -26,7 +26,7 @@ from ui.list_pick import PickList
 from ui.widget_android_package import AndroidPackageWidget
 from ui.widget_item_not_editable import NotEditableListWidgetItem
 
-from ui.processes_widget import ProcessList
+from ui.process_list import ProcessList
 
 
 class DevicesUpdateThread(QThread):

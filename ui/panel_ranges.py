@@ -16,12 +16,14 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 """
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QTreeView, QHeaderView, QMenu
+from PyQt5.QtWidgets import QHeaderView, QMenu
+
+from ui.list_view import DwarfListView
 
 import pyperclip
 
 
-class RangesPanel(QTreeView):
+class RangesPanel(DwarfListView):
     """ RangesPanel
 
         Signals:
@@ -100,21 +102,6 @@ class RangesPanel(QTreeView):
             self._uppercase_hex = value
         elif isinstance(value, str):
             self._uppercase_hex = (value == 'upper')
-
-    @property
-    def rows_dualcolor(self):
-        """ AlternatingRowColors
-        """
-        return self.alternatingRowColors()
-
-    @rows_dualcolor.setter
-    def rows_dualcolor(self, value):
-        """ AlternatingRowColors
-        """
-        if isinstance(value, bool):
-            self.setAlternatingRowColors(value)
-        elif isinstance(value, str):
-            self.setAlternatingRowColors(value == 'True')
 
     # ************************************************************************
     # **************************** Functions *********************************

@@ -176,27 +176,6 @@ class ModulesPanel(QWidget):
         elif isinstance(value, str):
             self._uppercase_hex = (value == 'upper')
 
-    @property
-    def rows_dualcolor(self):
-        """ AlternatingRowColors
-        """
-        return self.modules_list.alternatingRowColors()
-
-    @rows_dualcolor.setter
-    def rows_dualcolor(self, value):
-        """ AlternatingRowColors
-        """
-        if isinstance(value, bool):
-            self.modules_list.setAlternatingRowColors(value)
-            self.exports_list.setAlternatingRowColors(value)
-            self.imports_list.setAlternatingRowColors(value)
-            self.symbols_list.setAlternatingRowColors(value)
-        elif isinstance(value, str):
-            self.modules_list.setAlternatingRowColors(value == 'True')
-            self.imports_list.setAlternatingRowColors(value == 'True')
-            self.exports_list.setAlternatingRowColors(value == 'True')
-            self.symbols_list.setAlternatingRowColors(value == 'True')
-
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************
