@@ -49,7 +49,10 @@ class Prefs(QObject):
 
         if os.path.exists(self._prefs_file):
             with open(self._prefs_file, 'r') as f:
-                self._prefs = json.load(f)
+                try:
+                    self._prefs = json.load(f)
+                except:
+                    pass
 
         # reset single instance preferences
         self.put(EMULATOR_CALLBACKS_PATH, '')

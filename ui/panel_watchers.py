@@ -25,6 +25,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHeaderView, QHBoxLayout,
 
 import pyperclip
 from lib import utils
+from ui.list_view import DwarfListView
 
 
 class AddWatcherDialog(QDialog):
@@ -143,15 +144,9 @@ class WatchersPanel(QWidget):
         # setup ui
         v_box = QVBoxLayout(self)
         v_box.setContentsMargins(0, 0, 0, 0)
-        self.list_view = QTreeView(self)
-        self.list_view.setAutoFillBackground(True)
-        self.list_view.setAlternatingRowColors(True)
-        self.list_view.setEditTriggers(self.list_view.NoEditTriggers)
+        self.list_view = DwarfListView()
         self.list_view.setModel(self._watchers_model)
-        self.list_view.setHeaderHidden(True)
-        self.list_view.setRootIsDecorated(False)
-        self.list_view.header().setSectionResizeMode(
-            0, QHeaderView.Custom | QHeaderView.ResizeToContents)
+        self.list_view.header().setSectionResizeMode(0, QHeaderView.Stretch)
         self.list_view.header().setSectionResizeMode(
             1, QHeaderView.ResizeToContents | QHeaderView.Fixed)
         self.list_view.header().setSectionResizeMode(
@@ -307,7 +302,8 @@ class WatchersPanel(QWidget):
         if not from_api:
             # function was called directly so add it to dwarf
             if not self._app_window.dwarf.dwarf_api('isAddressWatched', ptr):
-                return self._app_window.dwarf.dwarf_api('addWatcher', [ptr, flags])
+                return self._app_window.dwarf.dwarf_api(
+                    'addWatcher', [ptr, flags])
 
         # show header
         self.list_view.setHeaderHidden(False)
@@ -388,18 +384,6 @@ class WatchersPanel(QWidget):
     # ************************************************************************
     # **************************** Handlers **********************************
     # ************************************************************************
-    # pylint: disable=invalid-name
-    def resizeEvent(self, event):
-        """ override todo autostretchfirstsection
-        """
-        s = self._watchers_model.item(0, 0)
-        if s:
-            s.setSizeHint(
-                QSize(
-                    event.size().width() + 9 -
-                    (self.list_view.header().sectionSize(2) * 4), 0))
-        return super().resizeEvent(event)
-
     def _on_contextmenu(self, pos):
         index = self.list_view.indexAt(pos).row()
         if index != -1:

@@ -234,7 +234,7 @@ class Dwarf(QObject):
 
     def on_message(self, message, data):
         if 'payload' not in message:
-            print(message)
+            print('payload: ' + message)
             return
 
         what = message['payload']
@@ -394,7 +394,7 @@ class Dwarf(QObject):
         elif cmd == 'watcher_removed':
             self.onWatcherRemoved.emit(parts[1])
         else:
-            print(what)
+            print('unknown message: ' + what)
 
     def on_destroyed(self):
         self._reinitialize()

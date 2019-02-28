@@ -27,6 +27,8 @@ class DwarfListView(QTreeView):
     def __init__(self, parent=None):
         super(DwarfListView, self).__init__(parent=parent)
 
+        self._uppercase_hex = True
+
         _prefs = Prefs()
         self.rows_dualcolor = _prefs.get('dwarf_ui_alternaterowcolors', False)
 

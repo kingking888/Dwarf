@@ -13,3 +13,4 @@ tools
 .vscode
 *.patch
 desktop.ini
+dwarf_window_pos.ini

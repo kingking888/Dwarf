@@ -280,14 +280,15 @@ class AppWindow(QMainWindow):
             self.watchers_panel.onItemAdded.connect(
                 self._on_watcher_added)
             self.watchers_dwidget.setWidget(self.watchers_panel)
+            self.watchers_dwidget.setObjectName('WatchersPanel')
             self.addDockWidget(Qt.LeftDockWidgetArea, self.watchers_dwidget)
-            self.resizeDocks([self.watchers_dwidget], [310], Qt.Horizontal)
             self.view_menu.addAction(self.watchers_dwidget.toggleViewAction())
         elif elem == 'hooks':
             from ui.panel_hooks import HooksPanel
             self.hooks_dwiget = QDockWidget('Hooks', self)
             self.hooks_panel = HooksPanel(self)
             self.hooks_dwiget.setWidget(self.hooks_panel)
+            self.hooks_dwiget.setObjectName('HooksPanel')
             self.addDockWidget(Qt.LeftDockWidgetArea, self.hooks_dwiget)
             self.view_menu.addAction(self.hooks_dwiget.toggleViewAction())
         elif elem == 'registers':
@@ -295,6 +296,7 @@ class AppWindow(QMainWindow):
             self.registers_dock = QDockWidget('Context', self)
             self.context_panel = ContextPanel(self)
             self.registers_dock.setWidget(self.context_panel)
+            self.registers_dock.setObjectName('ContextsPanel')
             self.addDockWidget(Qt.RightDockWidgetArea, self.registers_dock)
             self.view_menu.addAction(self.registers_dock.toggleViewAction())
         elif elem == 'memory':
@@ -316,6 +318,7 @@ class AppWindow(QMainWindow):
             self.console_panel = ConsolePanel(self)
             self.dwarf.onLogToConsole.connect(self._log_js_output)
             self.console_dock.setWidget(self.console_panel)
+            self.console_dock.setObjectName('ConsolePanel')
             self.addDockWidget(Qt.BottomDockWidgetArea, self.console_dock)
             self.view_menu.addAction(self.console_dock.toggleViewAction())
         elif elem == 'backtrace':
@@ -329,6 +332,7 @@ class AppWindow(QMainWindow):
             self.dwarf.onThreadResumed.connect(self.contexts_list_panel.resume_tid)
             self.contexts_list_panel.onItemDoubleClicked.connect(self._apply_context)
             self.threads_dock.setWidget(self.contexts_list_panel)
+            self.threads_dock.setObjectName('ThreadPanel')
             self.addDockWidget(Qt.RightDockWidgetArea, self.threads_dock)
             self.view_menu.addAction(self.threads_dock.toggleViewAction())
         elif elem == 'modules':
@@ -455,7 +459,10 @@ class AppWindow(QMainWindow):
 
     @property
     def dwarf(self):
-        return self.session_manager.session.dwarf
+        if self.session_manager.session is not None:
+            return self.session_manager.session.dwarf
+        else:
+            return None
 
     # ************************************************************************
     # **************************** Handlers **********************************
@@ -489,6 +496,14 @@ class AppWindow(QMainWindow):
         self.dwarf.onSetData.connect(self._on_set_data)
 
         self.session_manager.start_session(self.dwarf_args)
+        q_settings = QSettings("dwarf_window_pos.ini", QSettings.IniFormat)
+        ui_state = q_settings.value('dwarf_ui_state')
+        if ui_state:
+            self.restoreGeometry(ui_state)
+        window_state = q_settings.value('dwarf_ui_window', self.saveState())
+        if window_state:
+            self.restoreState(window_state)
+
         self.showMaximized()
 
     def session_stopped(self):
@@ -556,6 +571,10 @@ class AppWindow(QMainWindow):
 
             detaches dwarf
         """
+        # save windowstuff
+        q_settings = QSettings("dwarf_window_pos.ini", QSettings.IniFormat)
+        q_settings.setValue('dwarf_ui_state', self.saveGeometry())
+        q_settings.setValue('dwarf_ui_window', self.saveState())
         if self.session_manager.session is not None:
             self.session_manager.stop_session()
 
@@ -682,14 +701,16 @@ class AppWindow(QMainWindow):
         self.dwarf.hook_native(ptr, own_input=name)
 
     def on_tid_resumed(self, tid):
-        if self.dwarf.context_tid == tid:
-            self.context_panel.setRowCount(0)
-            # self.backtrace_panel.setRowCount(0)
-            # self.memory_panel.clear_panel()
-            # if self.get_java_explorer_panel() is not None:
-            #    self.get_java_explorer_panel().clear_panel()
+        if self.dwarf:
+            if self.dwarf.context_tid == tid:
+                pass
+                # self.context_panel.setRowCount(0)
+                # self.backtrace_panel.setRowCount(0)
+                # self.memory_panel.clear_panel()
+                # if self.get_java_explorer_panel() is not None:
+                #    self.get_java_explorer_panel().clear_panel()
 
-        # self.contexts_list_panel.resume_tid(tid)
+            # self.contexts_list_panel.resume_tid(tid)
 
     def _on_tracer_data(self, data):
         if not data:

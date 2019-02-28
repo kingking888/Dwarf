@@ -18,7 +18,8 @@ import os
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLineEdit
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+                             QFileDialog, QLineEdit, QHeaderView)
 
 from lib.adb import Adb
 from ui.list_view import DwarfListView
@@ -61,10 +62,10 @@ class ApkListDialog(QDialog):
     # ************************************************************************
     # **************************** Handlers **********************************
     # ************************************************************************
-
     def _on_install(self):
         if self.file_path.text() is '':
-            file_path = QFileDialog.getOpenFileName(self, 'Select an apk to install', QDir.currentPath(), '*.apk')
+            file_path = QFileDialog.getOpenFileName(
+                self, 'Select an apk to install', QDir.currentPath(), '*.apk')
             self.file_path.setText(file_path)
 
         if os.path.exists(self.file_path.text()):
@@ -136,6 +137,7 @@ class ApkList(DwarfListView):
             self.apk_model.setHeaderData(1, Qt.Horizontal, 'Path')
 
         self.setModel(self.apk_model)
+        self.header().setSectionResizeMode(0, QHeaderView.ResizeToContents)
 
         self.doubleClicked.connect(self._on_apk_selected)
 
