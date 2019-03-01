@@ -140,36 +140,7 @@ class AppWindow(QMainWindow):
         self.main_tabs.setMovable(False)
         self.main_tabs.setAutoFillBackground(True)
         self.setCentralWidget(self.main_tabs)
-        """
-        if dwarf_args.package is not None:
-            # we skip welcome ui here
-            if not self.get_adb().available():
-                # additional check if we have a local server to starts with
-                if frida.get_local_device() is None:
 
-                    msg = 'adb/device/emu not found or not rooted! see details or output'
-                    utils.show_message_box(
-                        msg,
-                        self.app.get_adb().get_states_string())
-                    return
-
-            if dwarf_args.spawn is not None:
-                err = self.dwarf.spawn(dwarf_args.package, dwarf_args.script)
-            else:
-                err = self.dwarf.attach(
-                    dwarf_args.package,
-                    dwarf_args.script,
-                    print_debug_error=False)
-
-                if err > 0:
-                    if err == 1:
-                        # no device? kidding?
-                        pass
-                    elif err == 2:
-                        # no proc to attach - fallback to spawn
-                        err = self.dwarf.spawn(dwarf_args.package,
-                                               dwarf_args.script)
-        """
         if self.dwarf_args.package is None:
             self.welcome_window = WelcomeDialog(self)
             self.welcome_window.setModal(True)
@@ -246,6 +217,8 @@ class AppWindow(QMainWindow):
             index = self.main_tabs.indexOf(self.trace_panel)
         elif name == 'data':
             index = self.main_tabs.indexOf(self.data_panel)
+        elif name == 'emulator':
+            index = self.main_tabs.indexOf(self.emulator_panel)
 
         self.main_tabs.setCurrentIndex(index)
 
@@ -270,8 +243,6 @@ class AppWindow(QMainWindow):
             from ui.panel_watchers import WatchersPanel
             self.watchers_dwidget = QDockWidget('Watchers', self)
             self.watchers_panel = WatchersPanel(self)
-            self.watchers_panel.uppercase_hex = self.prefs.get(
-                'dwarf_ui_hexstyle', 'upper')
             # dont respond to dblclick mem cant be shown
             # self.watchers_panel.onItemDoubleClicked.connect(
             #    self._on_watcher_clicked)
@@ -310,7 +281,8 @@ class AppWindow(QMainWindow):
         elif elem == 'javaexplorer':
             from ui.panel_java_explorer import JavaExplorerPanel
             self.java_explorer_panel = JavaExplorerPanel(self)
-            self.java_explorer_panel.hide()
+            # self.java_explorer_panel.hide()
+            self.main_tabs.addTab(self.java_explorer_panel, 'JavaExplorer')
             # box.addWidget(self.java_explorer_panel)
         elif elem == 'console':
             from ui.panel_console import ConsolePanel
@@ -338,8 +310,6 @@ class AppWindow(QMainWindow):
         elif elem == 'modules':
             from ui.panel_modules import ModulesPanel
             self.modules_panel = ModulesPanel(self)
-            self.modules_panel.uppercase_hex = self.prefs.get(
-                'dwarf_ui_hexstyle', 'upper')
             self.modules_panel.onModuleSelected.connect(
                 self._on_module_dblclicked)
             self.modules_panel.onModuleFuncSelected.connect(
@@ -350,8 +320,6 @@ class AppWindow(QMainWindow):
         elif elem == 'ranges':
             from ui.panel_ranges import RangesPanel
             self.ranges_panel = RangesPanel(self)
-            self.ranges_panel.uppercase_hex = self.prefs.get(
-                'dwarf_ui_hexstyle', 'upper')
             self.ranges_panel.onItemDoubleClicked.connect(self._range_dblclicked)
             self.ranges_panel.onDumpBinary.connect(self._on_dumpmodule)
             # connect to watcherpanel func
@@ -369,6 +337,10 @@ class AppWindow(QMainWindow):
             from ui.panel_asm import AsmPanel
             self.asm_panel = AsmPanel(self)
             self.main_tabs.addTab(self.asm_panel, 'Disassembly')
+        elif elem == 'emulator':
+            from ui.panel_emulator import EmulatorPanel
+            self.emulator_panel = EmulatorPanel(self)
+            self.main_tabs.addTab(self.emulator_panel, 'Emulator')
         else:
             print('no handler for elem: ' + elem)
 
@@ -682,7 +654,7 @@ class AppWindow(QMainWindow):
             if is_java:
                 self.context_panel.set_context(context['ptr'], 1,
                                                context['context'])
-                self.get_java_explorer_panel().set_handle_arg(-1)
+                self.java_explorer_panel.set_handle_arg(-1)
             else:
                 self.context_panel.set_context(context['ptr'], 0,
                                                context['context'])
@@ -703,7 +675,7 @@ class AppWindow(QMainWindow):
     def on_tid_resumed(self, tid):
         if self.dwarf:
             if self.dwarf.context_tid == tid:
-                pass
+                self.context_panel.clear()
                 # self.context_panel.setRowCount(0)
                 # self.backtrace_panel.setRowCount(0)
                 # self.memory_panel.clear_panel()
@@ -742,4 +714,4 @@ class AppWindow(QMainWindow):
 
         if self.data_panel is not None:
             self.show_main_tab('Data')
-            self.data_panel.append_data(data[0], data[1])
+            self.data_panel.append_data(data[0], data[1], data[2])

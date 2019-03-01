@@ -27,13 +27,19 @@ class ContextsListPanel(DwarfListView):
 
     def __init__(self, parent=None):
         super(ContextsListPanel, self).__init__(parent=parent)
+        self._app_window = parent
         self.dwarf = parent.dwarf
 
         self.threads_model = QStandardItemModel(0, 3)
         self.threads_model.setHeaderData(0, Qt.Horizontal, 'TID')
         self.threads_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
                                          Qt.TextAlignmentRole)
-        self.threads_model.setHeaderData(1, Qt.Horizontal, 'PC')
+        if self.dwarf.arch == 'ia32':
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'EIP')
+        elif self.dwarf.arch == 'x64':
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'RIP')
+        else:
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'PC')
         self.threads_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
                                          Qt.TextAlignmentRole)
         self.threads_model.setHeaderData(2, Qt.Horizontal, 'Symbol')
@@ -48,6 +54,12 @@ class ContextsListPanel(DwarfListView):
         self.doubleClicked.connect(self._item_doubleclicked)
 
     def add_context(self, data, library_onload=None):
+        if self.dwarf.arch == 'ia32':
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'EIP')
+        elif self.dwarf.arch == 'x64':
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'RIP')
+        else:
+            self.threads_model.setHeaderData(1, Qt.Horizontal, 'PC')
         is_java = data['is_java']
         tid = QStandardItem()
         tid.setText(str(data['tid']))
@@ -105,7 +117,7 @@ class ContextsListPanel(DwarfListView):
             tid = int(self.get_item_text(index, 0))
             glbl_pt = self.mapToGlobal(pos)
             context_menu = QMenu()
-            context_menu.addAction('Emulator')
+            context_menu.addAction('Emulator', self._on_cm_emulator)
             if self.dwarf.get_native_traced_tid() == tid:
                 context_menu.addAction('Stop Trace', self.dwarf.native_tracer_stop)
             else:
@@ -116,6 +128,12 @@ class ContextsListPanel(DwarfListView):
 
     def _on_cm_starttrace(self, tid):
         self.dwarf.native_tracer_start(int(tid))
+
+    def _on_cm_emulator(self):
+        if self._app_window.emulator_panel is None:
+            self._app_window._create_ui_elem('emulator')
+
+        self._app_window.show_main_tab('emulator')
 
 
 """

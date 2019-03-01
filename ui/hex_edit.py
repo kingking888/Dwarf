@@ -282,6 +282,9 @@ class HexEditor(QAbstractScrollArea):
         self.app = app
 
         self.range = None
+        self.data = None
+
+        self.base = 0
 
         # allow edit
         self._read_only = False  # todo: add something to range
@@ -507,6 +510,10 @@ class HexEditor(QAbstractScrollArea):
     def bytes_per_line(self, value):
         if isinstance(value, int):
             self._bytes_per_line = value
+            self._hex_width = self._bytes_per_line * (3 * self._char_width) - self._char_width
+            self._ascii_start = self._hex_start + self._hex_width + self._col_div
+            self._ascii_width = self._bytes_per_line * self._char_width
+            self.viewport().update()
             self.viewChanged.emit()
 
     @property
@@ -528,10 +535,10 @@ class HexEditor(QAbstractScrollArea):
     def number_of_lines(self):
         """ returns number of total lines
         """
-        if self.range is None:
+        if self.data is None:
             return 0
 
-        return int(len(self.range.data) / self._bytes_per_line)
+        return int(len(self.data) / self._bytes_per_line)
 
     def visible_columns(self):
         """ returns visible cols
@@ -560,22 +567,22 @@ class HexEditor(QAbstractScrollArea):
     def get_lines(self, pos=0):
         """ get bytes from data
         """
-        if self.range is None:
+        if self.data is None:
             return None
 
-        while pos < len(self.range.data) - self._bytes_per_line:
+        while pos < len(self.data) - self._bytes_per_line:
             yield (pos, self._bytes_per_line,
                    self._to_ascii(
-                       self.range.data[pos:pos + self._bytes_per_line]))
+                       self.data[pos:pos + self._bytes_per_line]))
             pos += self._bytes_per_line
 
-        yield (pos, len(self.range.data) - pos,
-               self._to_ascii(self.range.data[pos:]))
+        yield (pos, len(self.data) - pos,
+               self._to_ascii(self.data[pos:]))
 
     def get_bytes(self, count=1):
         """ get bytes from data
         """
-        return self.range.data[self._caret.position:self._caret.position +
+        return self.data[self._caret.position:self._caret.position +
                                count]
 
     def visible_lines(self):
@@ -620,6 +627,8 @@ class HexEditor(QAbstractScrollArea):
             line = int(ceil(column - (column / 3)))
             index = int(
                 floor(self.pos + line / 2 + row * self._bytes_per_line))
+            if index > len(self.data):
+                index = len(self.data)
             return Caret('hex', index, 0)
 
         # in ascii
@@ -630,6 +639,8 @@ class HexEditor(QAbstractScrollArea):
             line_index = int(ceil(column % self._bytes_per_line))
             index = int(
                 floor(self.pos + line_index + row * self._bytes_per_line))
+            if index > len(self.data):
+                index = len(self.data)
             return Caret('ascii', index, 0)
 
     def pixel_to_data(self, screen_x, screen_y):
@@ -731,21 +742,21 @@ class HexEditor(QAbstractScrollArea):
         self.horizontalScrollBar().setPageStep(self.visible_columns())
         self.verticalScrollBar().setRange(
             0,
-            self.number_of_lines() - self.visible_lines() + 1)
+            self.number_of_lines() - self.visible_lines() + 2)
         self.verticalScrollBar().setPageStep(self.visible_lines())
 
     def read_pointer(self):
         """ reads pointer from data
         """
 
-        if self.range is None:
+        if self.data is None:
             return
 
         # todo: little/big endian
         ptr_size = self.app.dwarf.pointer_size
         start = self.caret.position
         end = self.caret.position + ptr_size
-        ptr = int.from_bytes(self.range.data[start:end], sys.byteorder)
+        ptr = int.from_bytes(self.data[start:end], sys.byteorder)
         is_valid_ptr = self.app.dwarf_api('isValidPointer', ptr)
         if ptr > 0 and is_valid_ptr:
             return ptr
@@ -755,7 +766,7 @@ class HexEditor(QAbstractScrollArea):
     def modify_data(self, text):
         """ change data
         """
-        current_byte = self.range.data[self.caret.position]
+        current_byte = self.data[self.caret.position]
         _byte = 0
 
         # caret is hextype so allow nibble editing
@@ -778,9 +789,9 @@ class HexEditor(QAbstractScrollArea):
             return
 
         # change byte in data
-        data_bt = bytearray(self.range.data)
+        data_bt = bytearray(self.data)
         data_bt[self.caret.position] = _byte
-        self.range.data = bytes(data_bt)
+        self.data = bytes(data_bt)
 
         # emit datachanged
         self.dataChanged.emit(self.caret.position, 1)
@@ -788,10 +799,10 @@ class HexEditor(QAbstractScrollArea):
         # add highlight
         try:
             is_highlight = self.is_highlighted(self.caret.position +
-                                               self.range.base)
+                                               self.base)
             if not is_highlight:
                 self.add_highlight(
-                    HighLight('edited', self.caret.position + self.range.base,
+                    HighLight('edited', self.caret.position + self.base,
                               1))
         except HighlightExistsError:
             pass
@@ -800,9 +811,9 @@ class HexEditor(QAbstractScrollArea):
         if self.caret.mode == 'hex':
             # dont move to next byte when in nibbleedit
             if self.caret.nibble == 0:
-                self.caret.move_right(self.range.size)
+                self.caret.move_right(len(self.data))
         elif self.caret.mode == 'ascii':
-            self.caret.move_right(self.range.size)
+            self.caret.move_right(len(self.data))
         self._force_repaint(True)
 
     def get_highlight(self, address):
@@ -922,9 +933,9 @@ class HexEditor(QAbstractScrollArea):
                 c_code += '\n\t'  # next line
 
             if self._hex_style == 'upper':
-                c_code += '0x{0:02X}, '.format(self.range.data[i])
+                c_code += '0x{0:02X}, '.format(self.data[i])
             else:
-                c_code += '0x{0:02x}, '.format(self.range.data[i])
+                c_code += '0x{0:02x}, '.format(self.data[i])
 
         # remove last ', '
         c_code = c_code[0:-2]
@@ -943,9 +954,9 @@ class HexEditor(QAbstractScrollArea):
                 py_code += '\n\t'  # next line
 
             if self._hex_style == 'upper':
-                py_code += '0x{0:02X}, '.format(self.range.data[i])
+                py_code += '0x{0:02X}, '.format(self.data[i])
             else:
-                py_code += '0x{0:02x}, '.format(self.range.data[i])
+                py_code += '0x{0:02x}, '.format(self.data[i])
 
         # remove last ', '
         py_code = py_code[0:-2]
@@ -964,15 +975,20 @@ class HexEditor(QAbstractScrollArea):
                 js_code += '\n\t'  # next line
 
             if self._hex_style == 'upper':
-                js_code += '0x{0:02X}, '.format(self.range.data[i])
+                js_code += '0x{0:02X}, '.format(self.data[i])
             else:
-                js_code += '0x{0:02x}, '.format(self.range.data[i])
+                js_code += '0x{0:02x}, '.format(self.data[i])
 
         # remove last ', '
         js_code = js_code[0:-2]
         js_code += '\n];'
 
         return js_code
+
+    def set_data(self, data):
+        self.data = data
+        self.adjust()
+        self.viewChanged.emit()
 
     # ************************************************************************
     # **************************** Events  ***********************************
@@ -1000,7 +1016,7 @@ class HexEditor(QAbstractScrollArea):
             return
 
         # empty
-        if self.range is None:
+        if self.data is None:
             return
 
         # not left then nothing todo
@@ -1056,7 +1072,7 @@ class HexEditor(QAbstractScrollArea):
         else:
             self.viewport().setCursor(Qt.IBeamCursor)
 
-        if self.range is None:
+        if self.data is None:
             return
 
         if loc_y > self._header_height:
@@ -1064,7 +1080,7 @@ class HexEditor(QAbstractScrollArea):
                 self._hovered_line = self.pixel_to_line(loc_x, loc_y)
                 self.viewport().update()  # todo: optimize redraw rect
 
-        if self.range:
+        if self.data:
             show = False
             if loc_y > self._header_height + self._ver_spacing:
                 if loc_x > self._hex_start and loc_x < self._ascii_start:
@@ -1087,10 +1103,10 @@ class HexEditor(QAbstractScrollArea):
                 if show:
                     if self.is_64bit_address:
                         txt = 'Address: 0x{0:016X}'.format(index +
-                                                           self.range.base)
+                                                           self.base)
                     else:
                         txt = 'Address: 0x{0:08X}'.format(index +
-                                                          self.range.base)
+                                                          self.base)
                     if txt:
                         self.statusChanged.emit(txt)
 
@@ -1100,6 +1116,8 @@ class HexEditor(QAbstractScrollArea):
             if new_caret is None:
                 return
             self.selection.end = new_caret.position
+            if self.selection.end > len(self.data):
+                self.selection.end = len(self.data)
             self.selection.active = True
             self._force_repaint(True)
             self.selectionChanged.emit()
@@ -1126,22 +1144,22 @@ class HexEditor(QAbstractScrollArea):
 
         # caret movement
         if key == Qt.Key_Right:
-            self.caret.move_right(self.range.size)
+            self.caret.move_right(len(self.data))
         elif key == Qt.Key_Left:
             self.caret.move_left()
         elif key == Qt.Key_Up:
             self.caret.move_up(self._bytes_per_line)
         elif key == Qt.Key_Down:
-            self.caret.move_down(self._bytes_per_line, self.range.size)
+            self.caret.move_down(self._bytes_per_line, len(self.data))
         elif key == Qt.Key_PageUp:
             self.caret.move_up(self.visible_lines() * self._bytes_per_line)
         elif key == Qt.Key_PageDown:
             self.caret.move_down(self.visible_lines() * self._bytes_per_line,
-                                 self.range.size)
+                                 len(self.data))
         elif key == Qt.Key_Home:
             self.caret.position = 0
         elif key == Qt.Key_End:
-            self.caret.position = self.range.size
+            self.caret.position = len(self.data)
         elif key == Qt.Key_G and mod & Qt.ControlModifier:  # CTRL + G
             self.on_cm_jumpto()
         elif key == Qt.Key_D and mod & Qt.ControlModifier:  # CTRL + D
@@ -1215,9 +1233,9 @@ class HexEditor(QAbstractScrollArea):
 
                 if show:
                     if self.is_64bit_address:
-                        txt = '0x{0:016X}'.format(index + self.range.base)
+                        txt = '0x{0:016X}'.format(index + self.base)
                     else:
-                        txt = '0x{0:08X}'.format(index + self.range.base)
+                        txt = '0x{0:08X}'.format(index + self.base)
                     if txt:
                         copy_addr = context_menu.addAction(txt)
                         menu_actions[copy_addr] = pyperclip.copy(txt)
@@ -1281,7 +1299,7 @@ class HexEditor(QAbstractScrollArea):
     def on_cm_followpointer(self):
         """ ContextMenu FollowPointer
         """
-        if self.range is None:
+        if self.data is None:
             return
 
         ptr = self.read_pointer()
@@ -1319,10 +1337,10 @@ class HexEditor(QAbstractScrollArea):
             return
 
         if self.caret.mode == 'ascii':
-            data = self.range.data[start:end]
+            data = self.data[start:end]
             pyperclip.copy(self._to_ascii(data))
         else:
-            data = self.range.data[start:end]
+            data = self.data[start:end]
             data_str = "".join(['{:02x} '.format(x) for x in data])
             pyperclip.copy(data_str)
 
@@ -1390,7 +1408,7 @@ class HexEditor(QAbstractScrollArea):
                 except ValueError:
                     return
 
-        if count <= 0 or count > self.range.size:
+        if count <= 0 or count > len(data):
             return
 
         if start == end:
@@ -1398,14 +1416,14 @@ class HexEditor(QAbstractScrollArea):
         else:
             start_loc = start
 
-        data_bt = bytearray(self.range.data)
+        data_bt = bytearray(self.data)
 
         for i in range(start_loc, start_loc + count):
             data_bt[i] = byte
 
-        self.range.data = bytes(data_bt)
+        self.data = bytes(data_bt)
         self.add_highlight(
-            HighLight('edited', start_loc + self.range.base, count))
+            HighLight('edited', start_loc + self.base, count))
         self.dataChanged.emit(start_loc, count)
         self.viewChanged.emit()
 
@@ -1709,7 +1727,7 @@ class HexEditor(QAbstractScrollArea):
                          self._ctrl_colors['background'])
 
         # no data stop paint
-        if self.range is None:
+        if self.data is None:
             return
 
         # hover current line
@@ -1764,10 +1782,10 @@ class HexEditor(QAbstractScrollArea):
 
             # get data
             (address, length, ascii_) = line
-            data = self.range.data[address:address + length]
+            data = self.data[address:address + length]
 
             # fixup offset
-            address += self.range.base
+            address += self.base
 
             # paint address
             if i == self._hovered_line:
@@ -1812,7 +1830,7 @@ class HexEditor(QAbstractScrollArea):
                     painter.setPen(self._ctrl_colors['foreground'])
 
                 if self.selection.start <= (
-                        address + j) - self.range.base < self.selection.end:
+                        address + j) - self.base < self.selection.end:
                     painter.setPen(self._ctrl_colors['selection_fg'])
                     is_in_selection = True
 
@@ -1853,7 +1871,7 @@ class HexEditor(QAbstractScrollArea):
 
                         if self.selection.start <= (
                                 address +
-                                a) - self.range.base < self.selection.end:
+                                a) - self.base < self.selection.end:
                             painter.setPen(self._ctrl_colors['selection_fg'])
 
                     painter.drawText(
@@ -1900,6 +1918,8 @@ class HexEditor(QAbstractScrollArea):
             return 1
 
         self.adjust()
+        self.set_data(self.range.data)
+        self.base = self.range.base
 
         # todo: dont show view from here
         # if not self.isVisible():
@@ -1907,7 +1927,7 @@ class HexEditor(QAbstractScrollArea):
 
         self.setFocus()
         self.caret.position = int(
-            ceil((self.range.start_address - self.range.base)))
+            ceil((self.range.start_address - self.base)))
         self.adjust()
         # scroll position in middle when jumpto or something
         line = self.index_to_line(self.caret.position)
@@ -1928,6 +1948,8 @@ class HexEditor(QAbstractScrollArea):
 
     def on_script_destroyed(self):
         self.range = None
+        self.data = None
 
     def clear_panel(self):
         self.range = None
+        self.data = None

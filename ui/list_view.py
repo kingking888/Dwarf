@@ -14,8 +14,8 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QTreeView, QHeaderView
+from PyQt5.QtGui import QStandardItem
+from PyQt5.QtWidgets import QTreeView
 
 from lib.prefs import Prefs
 
@@ -31,6 +31,7 @@ class DwarfListView(QTreeView):
 
         _prefs = Prefs()
         self.rows_dualcolor = _prefs.get('dwarf_ui_alternaterowcolors', False)
+        self.uppercase_hex = _prefs.get('dwarf_ui_hexstyle', 'upper').lower() == 'upper'
 
         self.setEditTriggers(self.NoEditTriggers)
         self.setHeaderHidden(False)
@@ -55,6 +56,23 @@ class DwarfListView(QTreeView):
             self.setAlternatingRowColors(value)
         elif isinstance(value, str):
             self.setAlternatingRowColors(value.lower() == 'true')
+
+    @property
+    def uppercase_hex(self):
+        """ Addresses displayed lower/upper-case
+        """
+        return self._uppercase_hex
+
+    @uppercase_hex.setter
+    def uppercase_hex(self, value):
+        """ Addresses displayed lower/upper-case
+            value - bool or str
+                    'upper', 'lower'
+        """
+        if isinstance(value, bool):
+            self._uppercase_hex = value
+        elif isinstance(value, str):
+            self._uppercase_hex = (value == 'upper')
 
     # ************************************************************************
     # **************************** Functions *********************************

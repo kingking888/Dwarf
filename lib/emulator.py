@@ -37,6 +37,13 @@ VFP = "4ff4700001ee500fbff36f8f4ff08043e8ee103a"
 class Emulator(QObject):
 
     onEmulatorStart = pyqtSignal(name='onEmulatorStart')
+    onEmulatorStop = pyqtSignal(name='onEmulatorStop')
+    onEmulatorStep = pyqtSignal(name='onEmulatorStep')
+    onEmulatorHook = pyqtSignal(Instruction, name='onEmulatorHook')
+    onEmulatorMemoryHook = pyqtSignal(list, name='onEmulatorMemoryHook')
+    onEmulatorMemoryRangedMapped = pyqtSignal(list, name='onEmulatorMemoryRangedMapped')
+
+    onEmulatorLog = pyqtSignal(str, name='onEmulatorLog')
 
     def __init__(self, dwarf):
         super(Emulator, self).__init__()
@@ -84,14 +91,17 @@ class Emulator(QObject):
             self._current_cpu_mode = unicorn.UC_MODE_LITTLE_ENDIAN
         elif self.dwarf.arch == 'ia32':
             self.uc = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_32)
+            self.cs = Cs(CS_ARCH_X86, CS_MODE_32 | CS_MODE_LITTLE_ENDIAN)
         elif self.dwarf.arch == 'x64':
             self.uc = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_64)
+            self.cs = Cs(CS_ARCH_X86, CS_MODE_64 | CS_MODE_LITTLE_ENDIAN)
         else:
             # unsupported arch
             return 5
 
         # enable capstone details
-        self.cs.detail = True
+        if self.cs is not None:
+            self.cs.detail = True
 
         err = self.map_range(self.context.pc.value)
         if err > 0:
@@ -120,7 +130,7 @@ class Emulator(QObject):
         except Exception as e:
             self.log_to_ui('[*] error: ' + str(e))
         self._running = False
-        self.dwarf.get_bus().emit('emulator_stop')
+        self.onEmulatorStop.emit()
 
     def api(self, parts):
         """
@@ -169,7 +179,7 @@ class Emulator(QObject):
 
         for i in self.cs.disasm(bytes(uc.mem_read(address, size)), address):
             instruction = Instruction(self.dwarf, i)
-            self.dwarf.get_bus().emit('emulator_hook', self, instruction)
+            self.onEmulatorHook.emit(instruction)
             if self.callbacks is not None:
                 try:
                     self.callbacks.hook_code(self, instruction, address, size)
@@ -183,7 +193,7 @@ class Emulator(QObject):
         v = value
         if access == unicorn.UC_MEM_READ:
             v = int.from_bytes(uc.mem_read(address, size), 'little')
-        self.dwarf.get_bus().emit('emulator_memory_hook', uc, access, address, v)
+        self.onEmulatorMemoryHook.emit([uc, access, address, v])
         if self.callbacks is not None:
             try:
                 self.callbacks.hook_memory_access(self, access, address, size, v)
@@ -204,23 +214,24 @@ class Emulator(QObject):
         self.instructions_delay = self.dwarf.get_prefs().get(prefs.EMULATOR_INSTRUCTIONS_DELAY, 0.5)
 
     def map_range(self, address):
-        range = Range(Range.SOURCE_TARGET, self.dwarf)
-        if range.init_with_address(address) > 0:
+        range_ = Range(Range.SOURCE_TARGET, self.dwarf)
+        if range_.init_with_address(address) > 0:
             return 300
         try:
-            self.uc.mem_map(range.base, range.size)
+            self.uc.mem_map(range_.base, range_.size)
         except Exception as e:
             self.dwarf.log(e)
             return 301
 
         try:
-            self.uc.mem_write(range.base, range.data)
+            self.uc.mem_write(range_.base, range_.data)
         except Exception as e:
             self.dwarf.log(e)
             return 302
 
-        self.log_to_ui("[*] Mapped %d at 0x%x" % (range.size, range.base))
-        self.dwarf.get_bus().emit('emulator_memory_range_mapped', range.base, range.size)
+        self.log_to_ui("[*] Mapped %d at 0x%x" % (range_.size, range_.base))
+        self.onEmulatorMemoryRangedMapped.emit([range_.base, range_.size])
+
         return 0
 
     def setup(self, tid=0):
@@ -261,6 +272,10 @@ class Emulator(QObject):
                 address = self.uc.reg_read(unicorn.arm_const.UC_ARM_REG_PC)
             elif self.uc._arch == unicorn.UC_ARCH_ARM64:
                 address = self.uc.reg_read(unicorn.arm64_const.UC_ARM64_REG_PC)
+            elif self.uc._arch == unicorn.UC_ARCH_X86 and self.uc._mode == unicorn.UC_MODE_32:
+                address = self.uc.reg_read(unicorn.x86_const.UC_X86_REG_EIP)
+            elif self.uc._arch == unicorn.UC_ARCH_X86 and self.uc._mode == unicorn.UC_MODE_64:
+                address = self.uc.reg_read(unicorn.x86_const.UC_X86_REG_RIP)
             else:
                 # unsupported arch
                 return 2
@@ -269,7 +284,6 @@ class Emulator(QObject):
             self.log_to_ui('[*] start emulation from %s to %s' % (hex(address), hex(self.end_ptr)))
         else:
             self.log_to_ui('[*] stepping %s' % hex(address))
-        self.dwarf.get_bus().emit('emulator_start')
         self.onEmulatorStart.emit()
 
         if self.thumb:
@@ -299,7 +313,8 @@ class Emulator(QObject):
             self.end_ptr = address + (self.dwarf.pointer_size * 2)
         else:
             self.stepping = [False, False]
-        Thread(target=self.__start, args=(address, self.end_ptr)).start()
+        self.__start(address, self.end_ptr)
+        #Thread(target=self.__start, args=(address, self.end_ptr)).start()
         return 0
 
     def stop(self):
@@ -307,4 +322,4 @@ class Emulator(QObject):
             self.uc.emu_stop()
 
     def log_to_ui(self, what):
-        self.dwarf.get_bus().emit('emulator_log', what)
+        self.onEmulatorLog.emit(what)

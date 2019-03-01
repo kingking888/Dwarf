@@ -30,8 +30,11 @@ class ConsolePanel(QTabWidget):
         self.py_console = QConsoleWidget(parent, input_placeholder='>>>')
         self.py_console.onCommandExecute.connect(self.py_callback)
 
-        self.addTab(self.js_console, 'javascript')
-        self.addTab(self.py_console, 'python')
+        self.emu_console = QConsoleWidget(parent, has_input=False)
+
+        self.addTab(self.js_console, 'JavaScript')
+        self.addTab(self.py_console, 'Python')
+        self.addTab(self.emu_console, 'Emulator')
 
     def clear(self):
         self.js_console.clear()
@@ -42,6 +45,9 @@ class ConsolePanel(QTabWidget):
 
     def get_py_console(self):
         return self.py_console
+
+    def get_emu_console(self):
+        return self.emu_console
 
     def js_callback(self, text):
         # the output in the logs is handled in dwarf_api

@@ -299,6 +299,7 @@ QHeaderView::section {
 
 QTabWidget QFrame{
     border: 0;
+    background: #181818;
 }
 
 

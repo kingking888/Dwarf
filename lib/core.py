@@ -22,8 +22,6 @@ from threading import Thread
 import frida
 from PyQt5.QtCore import QObject, pyqtSignal
 from PyQt5.QtWidgets import QFileDialog
-from event_bus import EventBus
-from hexdump import hexdump
 from ui.hex_edit import HighLight, HighlightExistsError
 
 from lib import utils
@@ -64,6 +62,11 @@ class Dwarf(QObject):
     onSetData = pyqtSignal(list, name='onSetData')
     onThreadResumed = pyqtSignal(int, name='onThreadResumed')
 
+    onEnumerateJavaMethodsComplete = pyqtSignal(list, name='onEnumerateJavaMethodsComplete')
+
+    onMemoryScanComplete = pyqtSignal(list, name='onMemoryScanComplete')
+    onMemoryScanMatch = pyqtSignal(list, name='onMemoryScanMatch')
+
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
 
@@ -101,13 +104,14 @@ class Dwarf(QObject):
         self.native_traced_tid = 0
 
         # core utils
-        self.bus = EventBus()
         self.emulator = Emulator(self)
         self.git = Git()
         self.prefs = Prefs()
         self.script_manager = ScriptsManager(self)
 
         self._spawned = False
+
+        self.onApplyContext.connect(self._on_apply_context)
 
         self.keystone_installed = False
         try:
@@ -232,6 +236,35 @@ class Dwarf(QObject):
         self.load_script(script)
         return 0
 
+    def _to_ascii(self, string):
+        return "".join([
+           chr(x) if x >= 0x20 and x <= 0x7e or x == 0xff else "."
+           for x in string
+       ])
+
+    def format_data(self, data):
+        data = bytes(data)
+        pos = 0
+        formatted_data = ""
+        str_fmt = '{0:02X} '
+        while pos < len(data) - 16:
+            part = data[pos:pos + 16]
+            for i, byte in enumerate(part):
+                formatted_data += str_fmt.format(byte)
+
+            formatted_data += '\t\t\t'
+            formatted_data += self._to_ascii(data[pos:pos + 16])
+            formatted_data += '\n'
+            pos += 16
+
+        for i, byte in enumerate(data[pos:]):
+            formatted_data += str_fmt.format(byte)
+        formatted_data += '\t\t\t'
+        formatted_data += self._to_ascii(data[pos:])
+        # yield (pos, len(self.range.data) - pos, self._to_ascii(self.range.data[pos:]))
+
+        return formatted_data
+
     def on_message(self, message, data):
         if 'payload' not in message:
             print('payload: ' + message)
@@ -269,7 +302,8 @@ class Dwarf(QObject):
             if self.app.get_java_trace_panel() is not None:
                 self.app.get_java_trace_panel().on_enumeration_complete()
         elif cmd == 'enumerate_java_methods_complete':
-            self.bus.emit(parts[1], json.loads(parts[2]), parts[1])
+            self.onEnumerateJavaMethodsComplete.emit([parts[1], json.loads(parts[2])])
+            #self.bus.emit(parts[1], json.loads(parts[2]), parts[1])
         elif cmd == 'ftrace':
             if self.app.get_ftrace_panel() is not None:
                 self.app.get_ftrace_panel().append_data(parts[1])
@@ -315,10 +349,12 @@ class Dwarf(QObject):
         elif cmd == 'log':
             self.log(parts[1])
         elif cmd == 'memory_scan_match':
-            self.bus.emit(parts[1], parts[2], json.loads(parts[3]))
+            self.onMemoryScanMatch.emit([parts[1], parts[2], json.loads(parts[3])])
+            #self.bus.emit(parts[1], parts[2], json.loads(parts[3]))
         elif cmd == 'memory_scan_complete':
             self.app_window.get_menu().on_bytes_search_complete()
-            self.bus.emit(parts[1] + ' complete', 0, 0)
+            self.onMemoryScanComplete.emit([parts[1] + ' complete', 0, 0])
+            #self.bus.emit(parts[1] + ' complete', 0, 0)
         elif cmd == 'onload_callback':
             self.loading_library = parts[1]
             str_fmt = ('Hook onload {0} @thread := {1}'.format(parts[1], parts[3]))
@@ -330,47 +366,18 @@ class Dwarf(QObject):
             self.onThreadResumed.emit(int(parts[1]))
         elif cmd == 'set_context':
             data = json.loads(parts[1])
-            if 'context' in data:
-                context = Context(data['context'])
-                self.contexts[str(data['tid'])] = context
-
-                sym = ''
-                # if context and context.pc:
-                #    name = data['ptr']
-                if 'pc' in context.__dict__:
-                    name = data['ptr']
-                    if context.pc.symbol_name is not None:
-                        sym = '(%s - %s)' % (context.pc.symbol_module_name, context.pc.symbol_name)
-                else:
-                    name = data['ptr']
-                self.app_window.threads.add_context(data, library_onload=self.loading_library)
-                # check if data['reason'] is 0 (REASON_HOOK)
-                if self.loading_library is None and data['reason'] == 0:
-                    self.log('hook %s %s @thread := %d' % (name, sym, data['tid']))
-                if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
-                    return
-                # self.app.get_session_ui().request_session_ui_focus()
-            else:
-                self.arch = data['arch']
-                self.pointer_size = data['pointerSize']
-                self.java_available = data['java']
-                str_fmt = ('injected into := {0:d}'.format(self.pid))
-                self.log(str_fmt)
-
-            self.context_tid = data['tid']
             if 'modules' in data:
                 self.onSetModules.emit(data['modules'])
             if 'ranges' in data:
                 self.onSetRanges.emit(data['ranges'])
 
             self.onApplyContext.emit(data)
-            if self.loading_library is not None:
-                self.loading_library = None
         elif cmd == 'set_data':
             if data:
-                self.onSetData.emit([parts[1], hexdump(data, result='return')])
+                formatted_data = self.format_data(data)
+                self.onSetData.emit(['raw', parts[1], data])
             else:
-                self.onSetData.emit([parts[1], str(parts[2])])
+                self.onSetData.emit(['plain', parts[1], str(parts[2])])
         elif cmd == 'script_loaded':
             if self._spawned:
                 self.device.resume(self.pid)
@@ -395,6 +402,38 @@ class Dwarf(QObject):
             self.onWatcherRemoved.emit(parts[1])
         else:
             print('unknown message: ' + what)
+
+    def _on_apply_context(self, context_data):
+        if 'context' in context_data:
+            context = Context(context_data['context'])
+            self.contexts[str(context_data['tid'])] = context
+
+            sym = ''
+            # if context and context.pc:
+            #    name = data['ptr']
+            if 'pc' in context.__dict__:
+                name = context_data['ptr']
+                if context.pc.symbol_name is not None:
+                    sym = '(%s - %s)' % (context.pc.symbol_module_name, context.pc.symbol_name)
+            else:
+                name = context_data['ptr']
+            self.app_window.threads.add_context(context_data, library_onload=self.loading_library)
+            # check if data['reason'] is 0 (REASON_HOOK)
+            if self.loading_library is None and context_data['reason'] == 0:
+                self.log('hook %s %s @thread := %d' % (name, sym, context_data['tid']))
+            if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
+                return
+            # self.app.get_session_ui().request_session_ui_focus()
+        else:
+            self.arch = context_data['arch']
+            self.pointer_size = context_data['pointerSize']
+            self.java_available = context_data['java']
+            str_fmt = ('injected into := {0:d}'.format(self.pid))
+            self.log(str_fmt)
+
+        self.context_tid = context_data['tid']
+        if self.loading_library is not None:
+            self.loading_library = None
 
     def on_destroyed(self):
         self._reinitialize()
@@ -549,9 +588,6 @@ class Dwarf(QObject):
     # getters #
     #         #
     ###########
-
-    def get_bus(self):
-        return self.bus
 
     def get_emulator(self):
         return self.emulator

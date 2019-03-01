@@ -16,7 +16,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 """
 import json
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QStandardItemModel, QStandardItem
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QColor
 from PyQt5.QtWidgets import QHeaderView, QTabWidget
 
 from ui.widget_item_not_editable import NotEditableTableWidgetItem
@@ -37,8 +37,6 @@ class ContextPanel(QTabWidget):
         super(ContextPanel, self).__init__(parent=parent)
 
         self._app_window = parent
-
-        self._uppercase_hex = True
 
         self._nativectx_model = QStandardItemModel(0, 4)
         self._nativectx_model.setHeaderData(0, Qt.Horizontal, 'Reg')
@@ -63,41 +61,37 @@ class ContextPanel(QTabWidget):
         self._emulatorctx_model.setHeaderData(0, Qt.Horizontal, 'Reg')
         self._emulatorctx_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, 'Value')
-        self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+        #self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._emulatorctx_model.setHeaderData(2, Qt.Horizontal, 'Decimal')
 
         self._emulatorctx_list = DwarfListView()
         self._emulatorctx_list.setModel(self._emulatorctx_model)
 
+        self._emulatorctx_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self._emulatorctx_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+
         self._javactx_model = QStandardItemModel(0, 3)
         self._javactx_model.setHeaderData(0, Qt.Horizontal, 'Argument')
         self._javactx_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._javactx_model.setHeaderData(1, Qt.Horizontal, 'Class')
-        self._javactx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+        #self._javactx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._javactx_model.setHeaderData(2, Qt.Horizontal, 'Value')
 
         self._javactx_list = DwarfListView()
         self._javactx_list.setModel(self._javactx_model)
 
-    # ************************************************************************
-    # **************************** Properties ********************************
-    # ************************************************************************
-    @property
-    def uppercase_hex(self):
-        """ Addresses displayed lower/upper-case
-        """
-        return self._uppercase_hex
+        self._javactx_list.header().setSectionResizeMode(
+            0, QHeaderView.ResizeToContents)
+        self._javactx_list.header().setSectionResizeMode(
+            1, QHeaderView.ResizeToContents)
+        self._javactx_list.header().setSectionResizeMode(
+            2, QHeaderView.ResizeToContents)
 
-    @uppercase_hex.setter
-    def uppercase_hex(self, value):
-        """ Addresses displayed lower/upper-case
-            value - bool or str
-                    'upper', 'lower'
-        """
-        if isinstance(value, bool):
-            self._uppercase_hex = value
-        elif isinstance(value, str):
-            self._uppercase_hex = (value == 'upper')
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
 
     def clear(self):
         self._nativectx_list.clear()
@@ -105,6 +99,7 @@ class ContextPanel(QTabWidget):
         self._javactx_list.clear()
 
     def set_context(self, ptr, context_type, context):
+        self.clear()
         if isinstance(context, str):
             context = json.loads(context)
 
@@ -133,23 +128,17 @@ class ContextPanel(QTabWidget):
         if self.count() > 0:
             self.setCurrentIndex(index)
 
-    def _set_emulator_context(self, ptr, context):
-        if self.count() == 0:
-            self.addTab(self._emulatorctx_list, 'Emulator')
-
     def _set_native_context(self, ptr, context):
-        if self.count() == 0:
+        if self.indexOf(self._nativectx_list) == -1:
             self.addTab(self._nativectx_list, 'Native')
+            self.show_context_tab('Native')
         else:
             self.show_context_tab('Native')
 
         context_ptr = ptr
 
-        # if self._app_window.dwarf.get_loading_library() is not None:
-        #    context_ptr = self._app_window.dwarf.get_loading_library()
-
         for register in sorted(context):
-            # ???
+            # todo: ???
             if register.lower() == 'tojson':
                 continue
 
@@ -167,7 +156,7 @@ class ContextPanel(QTabWidget):
 
             if context[register] is not None:
                 str_fmt = '0x{0:x}'
-                if self._uppercase_hex:
+                if self._nativectx_list.uppercase_hex:
                     str_fmt = '0x{0:X}'
 
                 value_x.setText(str_fmt.format(int(context[register]['value'], 16)))
@@ -189,6 +178,50 @@ class ContextPanel(QTabWidget):
                             telescope.setForeground(Qt.darkGray)
 
             self._nativectx_model.appendRow([reg_name, value_x, value_dec, telescope])
+
+    def _set_emulator_context(self, ptr, context):
+        if self.indexOf(self._emulatorctx_list) == -1:
+            self.addTab(self._emulatorctx_list, 'Emulator')
+            self.show_context_tab('Emulator')
+        else:
+            self.show_context_tab('Emulator')
+
+        context_ptr = ptr
+
+        context = context.__dict__
+
+        for register in sorted(context):
+            # todo: ???
+            if register.startswith('_'):
+                continue
+
+            reg_name = QStandardItem()
+            reg_name.setTextAlignment(Qt.AlignCenter)
+            reg_name.setForeground(QColor('#39c'))
+            value_x = QStandardItem()
+            # value_x.setTextAlignment(Qt.AlignCenter)
+            value_dec = QStandardItem()
+            # value_dec.setTextAlignment(Qt.AlignCenter)
+            telescope = QStandardItem()
+
+            reg_name.setText(register)
+            reg_name.setData(context_ptr)
+
+            if context[register] is not None:
+                if isinstance(context[register], int):
+                    str_fmt = '0x{0:x}'
+                    if self._emulatorctx_list.uppercase_hex:
+                        str_fmt = '0x{0:X}'
+
+                    value_x.setText(str_fmt.format(context[register]))
+
+                    value_dec.setText('{0:d}'.format(context[register]))
+
+            self._emulatorctx_model.appendRow([reg_name, value_x, value_dec])
+
+    # ************************************************************************
+    # **************************** Handlers **********************************
+    # ************************************************************************
 
 
 """

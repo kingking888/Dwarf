@@ -24,6 +24,7 @@ class JavaMethodsPanel(TableBaseWidget):
     def __init__(self, app, *__args):
         super().__init__(app, 0, 1)
         self.app = app
+        self.app.dwarf.onEnumerateJavaMethodsComplete.connect(self.on_enumeration_complete)
         self.java_class = ''
         self.horizontalHeader().hide()
         self.horizontalHeader().setStretchLastSection(True)
@@ -42,10 +43,11 @@ class JavaMethodsPanel(TableBaseWidget):
 
     def initialize_with_class(self, java_class):
         self.java_class = java_class
-        self.app.get_dwarf().get_bus().add_event(self.on_enumeration_complete, java_class)
+        #self.app.get_dwarf().get_bus().add_event(self.on_enumeration_complete, java_class)
         self.app.dwarf_api('enumerateJavaMethods', java_class)
 
-    def on_enumeration_complete(self, methods, class_name):
+    def on_enumeration_complete(self, data):
+        methods, class_name = data
         for method in sorted(methods):
             row = self.rowCount()
             self.insertRow(row)

@@ -25,6 +25,7 @@ from ui.widget_console import QConsoleWidget
 from ui.widget_item_not_editable import NotEditableTableWidgetItem, NotEditableListWidgetItem
 from ui.widget_memory import QMemoryWidget
 from ui.widget_memory_address import MemoryAddressWidget
+from ui.panel_memory import MemoryPanel
 
 from capstone import *
 from unicorn.unicorn_const import UC_MEM_READ
@@ -57,7 +58,7 @@ class AsmTableWidget(QTableWidget):
 
         # check if the code jumped
         if self._last_instruction_address > 0:
-            if instruction.address > self._last_instruction_address + self.app.get_dwarf().pointer_size or\
+            if instruction.address > self._last_instruction_address + self.app.dwarf.pointer_size or\
                     instruction.address < self._last_instruction_address:
                 # insert an empty line
                 self.insertRow(self.rowCount())
@@ -147,7 +148,7 @@ class EmulatorPanel(QWidget):
         super().__init__(*__args)
 
         self.app = app
-        self.emulator = self.app.get_dwarf().get_emulator()
+        self.emulator = self.app.dwarf.get_emulator()
         self.until_address = 0
 
         layout = QVBoxLayout()
@@ -186,7 +187,7 @@ class EmulatorPanel(QWidget):
         self.central_panel.setOrientation(Qt.Vertical)
 
         self.asm_table = AsmTableWidget(self.app)
-        self.memory_table = MemoryTableWidget(self.app)
+        self.memory_table = MemoryPanel(self.app)
 
         self.ranges_list = QListWidget(self.app)
         self.ranges_list.itemDoubleClicked.connect(self.ranges_item_double_clicked)
@@ -211,8 +212,8 @@ class EmulatorPanel(QWidget):
         self.panel.setStretchFactor(1, 4)
         splitter.addWidget(self.panel)
 
-        self.console = QConsoleWidget(self.app)
-        splitter.addWidget(self.console)
+        self.console = self.app.console.get_emu_console()  # QConsoleWidget(self.app)
+        # splitter.addWidget(self.console)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 1)
@@ -226,13 +227,12 @@ class EmulatorPanel(QWidget):
         # and fire it in emulator via self.onEmulatorStart.emit()
         # no need for extra external lib
         self.emulator.onEmulatorStart.connect(self.on_emulator_start)
-
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_start, 'emulator_start')
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_stop, 'emulator_stop')
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_hook, 'emulator_hook')
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_memory_hook, 'emulator_memory_hook')
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_memory_range_mapped, 'emulator_memory_range_mapped')
-        self.app.get_dwarf().get_bus().add_event(self.on_emulator_log, 'emulator_log')
+        self.emulator.onEmulatorStop.connect(self.on_emulator_stop)
+        # self.emulator.onEmulatorStep.connect(self.on_emulator_step)
+        self.emulator.onEmulatorHook.connect(self.on_emulator_hook)
+        self.emulator.onEmulatorMemoryHook.connect(self.on_emulator_memory_hook)
+        self.emulator.onEmulatorMemoryRangedMapped.connect(self.on_emulator_memory_range_mapped)
+        self.emulator.onEmulatorLog.connect(self.on_emulator_log)
 
     def handle_clean(self):
         self.ranges_list.clear()
@@ -242,7 +242,7 @@ class EmulatorPanel(QWidget):
         self.emulator.clean()
 
     def handle_options(self):
-        EmulatorConfigsDialog.show_dialog(self.app.get_dwarf())
+        EmulatorConfigsDialog.show_dialog(self.app.dwarf)
 
     def handle_start(self):
         ph = ''
@@ -268,17 +268,21 @@ class EmulatorPanel(QWidget):
     def handle_stop(self):
         self.emulator.stop()
 
-    def on_emulator_hook(self, emulator, instruction):
-        self.context_panel.set_context(emulator.current_context.pc, 2, emulator.current_context)
-        self.asm_table.add_hook(emulator, instruction)
+    def on_emulator_hook(self, instruction):
+        self.app.context_panel.set_context(0, 2, self.emulator.current_context)
+        #self.context_panel.set_context(0, 2, emulator.current_context)
+        #self.context_panel.set_context(emulator.current_context.pc, 2, emulator.current_context)
+        self.asm_table.add_hook(self.emulator, instruction)
 
     def on_emulator_log(self, log):
         self.console.log(log)
 
-    def on_emulator_memory_hook(self, uc, access, address, value):
+    def on_emulator_memory_hook(self, data):
+        uc, access, address, value = data
         self.asm_table.add_memory_hook(uc, access, address, value)
 
-    def on_emulator_memory_range_mapped(self, address, size):
+    def on_emulator_memory_range_mapped(self, data):
+        address, size = data
         q = NotEditableListWidgetItem(hex(address))
         q.setForeground(Qt.red)
         self.ranges_list.addItem(q)

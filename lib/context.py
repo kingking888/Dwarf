@@ -15,21 +15,21 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
 from lib.register import Register
+import unicorn
 
 
 class Context(object):
     def __init__(self, context):
-        # quickest way to check if it's native context
-        if 'toJSON' in context:
-            for register in context:
-                if len(register) > 0 and register != 'toJSON':
-                    self.__dict__[register] = Register(context[register])
+        for register in context:
+            if len(register) > 0 and register != 'toJSON':
+                self.__dict__[register] = Register(context[register])
 
 
 class EmulatorContext(object):
     """
     holds emulator context related stuffs
     """
+
     def __init__(self, dwarf):
         import unicorn
 
@@ -55,4 +55,7 @@ class EmulatorContext(object):
 
     def set_context(self, uc):
         for reg in self._unicorn_registers:
-            self.__dict__[reg] = uc.reg_read(self._unicorn_registers[reg])
+            try:
+                self.__dict__[reg] = uc.reg_read(self._unicorn_registers[reg])
+            except unicorn.unicorn.UcError:
+                pass

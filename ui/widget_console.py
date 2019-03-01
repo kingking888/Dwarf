@@ -88,7 +88,7 @@ class QConsoleWidget(QWidget):
 
     onCommandExecute = pyqtSignal(str, name='onCommandExecute')
 
-    def __init__(self, parent=None, input_placeholder='', function_box=False):
+    def __init__(self, parent=None, input_placeholder='', function_box=False, has_input=True):
         super(QConsoleWidget, self).__init__(parent=parent)
 
         self.app_window = parent
@@ -107,24 +107,25 @@ class QConsoleWidget(QWidget):
 
         layout.addWidget(self.output)
 
-        box = QHBoxLayout()
-        box.setContentsMargins(QMargins(3, 3, 3, 3))
+        if has_input:
+            box = QHBoxLayout()
+            box.setContentsMargins(QMargins(3, 3, 3, 3))
 
-        self.input = QConsoleInputWidget(self)
-        self.input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.input.setPlaceholderText(input_placeholder)
-        self.input.onEnterKeyPressed.connect(self._enter_pressed)
-        box.addWidget(self.input)
+            self.input = QConsoleInputWidget(self)
+            self.input.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+            self.input.setPlaceholderText(input_placeholder)
+            self.input.onEnterKeyPressed.connect(self._enter_pressed)
+            box.addWidget(self.input)
 
-        if function_box:
-            function_btn = QPushButton('ƒ')
-            function_btn.setMinimumWidth(25)
-            function_btn.clicked.connect(self.js_function_box)
-            box.addWidget(function_btn)
+            if function_box:
+                function_btn = QPushButton('ƒ')
+                function_btn.setMinimumWidth(25)
+                function_btn.clicked.connect(self.js_function_box)
+                box.addWidget(function_btn)
 
-        box_widget = QWidget()
-        box_widget.setLayout(box)
-        layout.addWidget(box_widget)
+            box_widget = QWidget()
+            box_widget.setLayout(box)
+            layout.addWidget(box_widget)
 
         self.setLayout(layout)
 
