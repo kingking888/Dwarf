@@ -15,9 +15,10 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
 import json
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt5.QtGui import QStandardItemModel, QStandardItem, QColor
-from PyQt5.QtWidgets import QHeaderView, QTabWidget
+from PyQt5.QtWidgets import QHeaderView, QTabWidget, QMenu
+import pyperclip
 
 from ui.widget_item_not_editable import NotEditableTableWidgetItem
 from ui.widget_memory_address import MemoryAddressWidget
@@ -28,10 +29,12 @@ from ui.list_view import DwarfListView
 
 
 class ContextPanel(QTabWidget):
-
+    # consts
     CONTEXT_TYPE_NATIVE = 0
     CONTEXT_TYPE_JAVA = 1
     CONTEXT_TYPE_EMULATOR = 2
+
+    onShowMemoryRequest = pyqtSignal(str, name='onShowMemoryRequest')
 
     def __init__(self, parent=None):
         super(ContextPanel, self).__init__(parent=parent)
@@ -57,6 +60,9 @@ class ContextPanel(QTabWidget):
         self._nativectx_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
 
+        self._nativectx_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._nativectx_list.customContextMenuRequested.connect(self._on_native_contextmenu)
+
         self._emulatorctx_model = QStandardItemModel(0, 3)
         self._emulatorctx_model.setHeaderData(0, Qt.Horizontal, 'Reg')
         self._emulatorctx_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
@@ -71,6 +77,9 @@ class ContextPanel(QTabWidget):
             0, QHeaderView.ResizeToContents)
         self._emulatorctx_list.header().setSectionResizeMode(
             1, QHeaderView.ResizeToContents)
+
+        self._emulatorctx_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._emulatorctx_list.customContextMenuRequested.connect(self._on_emulator_contextmenu)
 
         self._javactx_model = QStandardItemModel(0, 3)
         self._javactx_model.setHeaderData(0, Qt.Horizontal, 'Argument')
@@ -89,25 +98,29 @@ class ContextPanel(QTabWidget):
         self._javactx_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
 
+        self._javactx_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._javactx_list.customContextMenuRequested.connect(self._on_java_contextmenu)
+
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************
-
     def clear(self):
         self._nativectx_list.clear()
         self._emulatorctx_list.clear()
         self._javactx_list.clear()
 
     def set_context(self, ptr, context_type, context):
-        self.clear()
         if isinstance(context, str):
             context = json.loads(context)
 
         if context_type == ContextPanel.CONTEXT_TYPE_NATIVE:
+            self._nativectx_list.clear()
             self._set_native_context(ptr, context)
         elif context_type == ContextPanel.CONTEXT_TYPE_JAVA:
+            self._javactx_list.clear()
             self._set_java_context(ptr, context)
         elif context_type == ContextPanel.CONTEXT_TYPE_EMULATOR:
+            self._emulatorctx_list.clear()
             self._set_emulator_context(ptr, context)
         else:
             raise Exception('unknown context type')
@@ -144,7 +157,10 @@ class ContextPanel(QTabWidget):
 
             reg_name = QStandardItem()
             reg_name.setTextAlignment(Qt.AlignCenter)
-            reg_name.setForeground(Qt.red)
+            if context[register]['isValidPointer']:
+                reg_name.setForeground(Qt.red)
+                reg_name.setData(context_ptr)
+
             value_x = QStandardItem()
             # value_x.setTextAlignment(Qt.AlignCenter)
             value_dec = QStandardItem()
@@ -152,7 +168,6 @@ class ContextPanel(QTabWidget):
             telescope = QStandardItem()
 
             reg_name.setText(register)
-            reg_name.setData(context_ptr)
 
             if context[register] is not None:
                 str_fmt = '0x{0:x}'
@@ -167,8 +182,8 @@ class ContextPanel(QTabWidget):
                     if 'telescope' in context[register] and context[register]['telescope'] is not None:
                         telescope = QStandardItem()
                         telescope.setText(str(context[register]['telescope'][1]))
-                        if context[register]['telescope'][0] == 1:
-                            telescope.setData('isAddress')
+                        if context[register]['telescope'][0] == 2:
+                            telescope.setData(context[register]['telescope'][1], Qt.UserRole + 1)
 
                         if context[register]['telescope'][0] == 0:
                             telescope.setForeground(Qt.darkGreen)
@@ -202,7 +217,6 @@ class ContextPanel(QTabWidget):
             # value_x.setTextAlignment(Qt.AlignCenter)
             value_dec = QStandardItem()
             # value_dec.setTextAlignment(Qt.AlignCenter)
-            telescope = QStandardItem()
 
             reg_name.setText(register)
             reg_name.setData(context_ptr)
@@ -222,6 +236,42 @@ class ContextPanel(QTabWidget):
     # ************************************************************************
     # **************************** Handlers **********************************
     # ************************************************************************
+    def _on_native_contextmenu(self, pos):
+        index = self._nativectx_list.indexAt(pos).row()
+        glbl_pt = self._nativectx_list.mapToGlobal(pos)
+        context_menu = QMenu(self)
+        if index != -1:
+            context_menu.addAction('Copy Address', lambda: self._copy_address(self._nativectx_model.item(index, 4).text()))
+        context_menu.exec_(glbl_pt)
+
+    def _on_emulator_contextmenu(self, pos):
+        index = self._emulatorctx_list.indexAt(pos).row()
+        glbl_pt = self._emulatorctx_list.mapToGlobal(pos)
+        context_menu = QMenu(self)
+        if index != -1:
+            pass
+        context_menu.exec_(glbl_pt)
+
+    def _on_java_contextmenu(self, pos):
+        index = self._javactx_list.indexAt(pos).row()
+        glbl_pt = self._javactx_list.mapToGlobal(pos)
+        context_menu = QMenu(self)
+        if index != -1:
+            pass
+        context_menu.exec_(glbl_pt)
+
+    def _copy_address(self, data):
+        """ MenuItem Copy Address
+        """
+        if isinstance(data, str):
+            if data.startswith('0x'):
+                pyperclip.copy(data)
+        elif isinstance(data, int):
+            str_fmt = '0x{0:X}'
+            if not self.uppercase_hex:
+                str_fmt = '0x{0:x}'
+
+            pyperclip.copy(str_fmt.format(data))
 
 
 """

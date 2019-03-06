@@ -19,7 +19,6 @@ from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, \
 from PyQt5.QtGui import QFont, QSyntaxHighlighter, QTextCharFormat, QColor, QFontDatabase, QPainter, QTextCursor
 from PyQt5.QtCore import QFile, QRegExp, Qt, QRegularExpression, QRect, QSize, QStringListModel, pyqtSignal
 
-from lib.prefs import Prefs
 from ui.dialog_scripts import ScriptsDialog
 
 
@@ -27,19 +26,19 @@ from ui.code_editor import JsCodeEditor
 
 
 class JsEditorDialog(QDialog):
-    def __init__(self, app, def_text='', placeholder_text='', flags=None, *args, **kwargs):
+    def __init__(self, app_window, def_text='', placeholder_text='', flags=None, *args, **kwargs):
         super().__init__(flags, *args, **kwargs)
 
         self.setWindowTitle('CodeEditor')
-        self._prefs = Prefs()
+        self._app_window = app_window
 
-        font_size_pref = self._prefs.get('dwarf_ui_theme_editor_fs')
+        font_size_pref = self._app_window.prefs.get('dwarf_ui_theme_editor_fs')
         if font_size_pref:
             try:
                 font_size_pref = int(font_size_pref)
             except ValueError:
                 # default size
-                font_size_pref = 10
+                font_size_pref = 11
 
         # todo: add font selector
         self.editor_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
@@ -53,12 +52,10 @@ class JsEditorDialog(QDialog):
             if font_size_pref >= 9 and font_size_pref <= 15:
                 self.editor_font.setPointSize(font_size_pref)
             else:
-                self.editor_font.setPointSize(10)
+                self.editor_font.setPointSize(11)
         else:
             # default size
-            self.editor_font.setPointSize(10)
-
-        self.app = app
+            self.editor_font.setPointSize(11)
 
         self.input_widget = JsCodeEditor()
         self.input_widget.line_numbers = True
@@ -109,7 +106,7 @@ class JsEditorDialog(QDialog):
 
     def change_font_size(self, size):
         if size >= 9 and size <= 15:
-            self._prefs.put('dwarf_ui_theme_editor_fs', size)
+            self._app_window.prefs.put('dwarf_ui_theme_editor_fs', size)
             self.editor_font.setPointSize(size)
             self.input_widget.setFont(self.editor_font)
         self.input_widget.setTabStopDistance(self.input_widget.fontMetrics().width('9999'))
@@ -123,7 +120,7 @@ class JsEditorDialog(QDialog):
         super(JsEditorDialog, self).keyPressEvent(event)
 
     def handler_dwarf_scripts(self):
-        accept, script = ScriptsDialog.pick(self.app)
+        accept, script = ScriptsDialog.pick(self._app_window)
         if accept and script is not None:
             self.input_widget.setPlainText(script)
 

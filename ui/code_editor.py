@@ -52,69 +52,180 @@ class JsHighlighter(QSyntaxHighlighter):
     def __init__(self, parent=None):
         super(JsHighlighter, self).__init__(parent)
 
-        keyword_color = QColor('#C678DD')
-        comment_color = QColor('#5C6370')
-        function_color = QColor('#61AFEF')
-        string_color = QColor('#98C379')
-        number_color = QColor('#e06c75')
-        constant_color = QColor('#D19A66')
+        self.keyword_color = QColor('#C678DD')
+        self.comment_color = QColor('#5C6370')
+        self.function_color = QColor('#61AFEF')
+        self.string_color = QColor('#98C379')
+        self.number_color = QColor('#e06c75')
+        self.constant_color = QColor('#D19A66')
 
-        keywordFormat = QTextCharFormat()
-        keywordFormat.setForeground(keyword_color)
-        keywordFormat.setFontWeight(QFont.Bold)
-
-        keywordPatterns = [
-            "\\bbreak\\b", "\\bcase\\b", "\\bcatch\\b", "\\bclass\\b",
-            "\\bconst\\b", "\\continue\\b", "\\bdebugger\\b", "\\bdefault\\b",
-            "\\bdelete\\b", "\\bdo\\b", "\\belse\\b", "\\bexport\\b",
-            "\\bextends\\b", "\\bfinally\\b", "\\bfor\\b", "\\bfunction\\b",
-            "\\bif\\b", "\\bimport\\b", "\\bin\\b", "\\binstanceof\\b",
-            "\\bnew\\b", "\\breturn\\b", "\\bsuper\\b", "\\bswitch\\b",
-            "\\bthis\\b", "\\bthrow\\b", "\\btry\\b", "\\btypeof\\b",
-            "\\bvar\\b", "\\bvoid\\b", "\\bwhile\\b", "\\bwith\\b",
-            "\\byield\\b"
+        self._keywords = [
+            "break", "case", "catch", "class", "const", "continue", "debugger",
+            "default", "delete", "do", "else", "export", "extends", "false", "finally",
+            "for", "function", "if", "import", "in", "instanceof", "new", "null",
+            "return", "super", "switch", "this", "throw", "true", "try", "typeof",
+            "var", "void", "while", "with", "yield"
         ]
 
-        self.highlightingRules = [(QRegExp(pattern), keywordFormat)
-                                  for pattern in keywordPatterns]
+        self._known_m = [
+            "Memory", "Process", "MemoryWatcher", "Thread", "Object", "Function", "Interceptor", "Java",
+            "JSON", "console"
+        ]
+
+        self._known = [
+            'log', 'addWatcher', 'deleteHook', 'enumerateJavaClasses',
+            'enumerateJavaMethods', 'findExport', 'getAddressTs',
+            'hookAllJavaMethods', 'hookJava', 'hookNative'
+            'hookOnLoad', 'javaBacktrace', 'isAddressWatched',
+            'nativeBacktrace', 'release', 'removeWatcher', 'restart',
+            'setData', 'startNativeTracer', 'stopNativeTracer',
+            "prototype",
+            "create",
+            "defineProperty",
+            "defineProperties",
+            "getOwnPropertyDescriptor",
+            "keys",
+            "getOwnPropertyNames",
+            "constructor",
+            "__parent__",
+            "__proto__",
+            "__defineGetter__",
+            "__defineSetter__",
+            "eval",
+            "hasOwnProperty",
+            "isPrototypeOf",
+            "__lookupGetter__",
+            "__lookupSetter__",
+            "__noSuchMethod__",
+            "propertyIsEnumerable",
+            "toSource",
+            "toLocaleString",
+            "toString",
+            "unwatch",
+            "valueOf",
+            "watch",
+            "arguments",
+            "arity",
+            "caller",
+            "constructor",
+            "length",
+            "name",
+            "apply",
+            "bind",
+            "call",
+            "String",
+            "fromCharCode",
+            "length",
+            "charAt",
+            "charCodeAt",
+            "concat",
+            "indexOf",
+            "lastIndexOf",
+            "localCompare",
+            "match",
+            "quote",
+            "replace",
+            "search",
+            "slice",
+            "split",
+            "substr",
+            "substring",
+            "toLocaleLowerCase",
+            "toLocaleUpperCase",
+            "toLowerCase",
+            "toUpperCase",
+            "trim",
+            "trimLeft",
+            "trimRight",
+            "Array",
+            "isArray",
+            "index",
+            "input",
+            "pop",
+            "push",
+            "reverse",
+            "shift",
+            "sort",
+            "splice",
+            "unshift",
+            "concat",
+            "join",
+            "filter",
+            "forEach",
+            "every",
+            "map",
+            "some",
+            "reduce",
+            "reduceRight",
+            "RegExp",
+            "global",
+            "ignoreCase",
+            "lastIndex",
+            "multiline",
+            "source",
+            "exec",
+            "test",
+            "parse",
+            "stringify",
+            "decodeURI",
+            "decodeURIComponent",
+            "encodeURI",
+            "encodeURIComponent",
+            "eval",
+            "isFinite",
+            "isNaN",
+            "parseFloat",
+            "parseInt",
+            "Infinity",
+            "NaN",
+            "undefined",
+            "Math",
+            "E",
+            "LN2",
+            "LN10",
+            "LOG2E",
+            "LOG10E",
+            "PI",
+            "SQRT1_2",
+            "SQRT2",
+            "abs",
+            "acos",
+            "asin",
+            "atan",
+            "atan2",
+            "ceil",
+            "cos",
+            "exp",
+            "floor",
+            "log",
+            "max",
+            "min",
+            "pow",
+            "random",
+            "round",
+            "sin",
+            "sqrt",
+            "tan",
+            "document",
+            "window",
+            "navigator",
+            "userAgent",
+        ]
+
+        self.highlightingRules = []
 
         classFormat = QTextCharFormat()
         classFormat.setFontWeight(QFont.Bold)
-        classFormat.setForeground(Qt.darkMagenta)
+        classFormat.setForeground(self.constant_color)
         self.highlightingRules.append((QRegExp("\\bnew [A-Za-z]+\\b"),
                                        classFormat))
 
-        singleLineCommentFormat = QTextCharFormat()
-        singleLineCommentFormat.setForeground(comment_color)
-        singleLineCommentFormat.setFontItalic(True)
-        self.highlightingRules.append((QRegExp("//[^\n]*"),
-                                       singleLineCommentFormat))
-
-        self.multiLineCommentFormat = QTextCharFormat()
-        self.multiLineCommentFormat.setFontItalic(True)
-        self.multiLineCommentFormat.setForeground(comment_color)
-
-        numberFormat = QTextCharFormat()
-        numberFormat.setForeground(number_color)
-        self.highlightingRules.append((QRegExp("\-*\d+\\b"), numberFormat))
-
-        quotationFormat = QTextCharFormat()
-        quotationFormat.setForeground(string_color)
-        self.highlightingRules.append((QRegExp("\".*\""), quotationFormat))
-        self.highlightingRules.append((QRegExp("\'.*\'"), quotationFormat))
-
         functionFormat = QTextCharFormat()
-        functionFormat.setForeground(function_color)
+        functionFormat.setForeground(self.function_color)
         self.highlightingRules.append(
             (QRegExp("(?!function)\\b[A-Za-z0-9_]+(?=\\()"), functionFormat))
 
-        self.commentStartExpression = QRegExp("/\\*")
-        self.commentEndExpression = QRegExp("\\*/")
-
     def highlightBlock(self, text):
-        # todo: step trough text
-        # todo: regexp suxx
-
         for pattern, format in self.highlightingRules:
             expression = QRegExp(pattern)
             expression.setMinimal(True)
@@ -126,24 +237,125 @@ class JsHighlighter(QSyntaxHighlighter):
 
         self.setCurrentBlockState(0)
 
-        startIndex = 0
-        if self.previousBlockState() != 1:
-            startIndex = self.commentStartExpression.indexIn(text)
+        blockState = self.previousBlockState()
+        bracketLevel = blockState >> 4
+        state = blockState & 15
 
-        while startIndex >= 0:
-            endIndex = self.commentEndExpression.indexIn(text, startIndex)
+        if blockState < 0:
+            bracketLevel = 0
+            state = 0
 
-            if endIndex == -1:
-                self.setCurrentBlockState(1)
-                commentLength = len(text) - startIndex
+        start = 0
+        i = 0
+        while i < len(text):
+            cur_ch = ''
+            next_ch = ''
+            if i < len(text):
+                cur_ch = text[i]
+            if i < len(text) - 1:
+                next_ch = text[i + 1]
+
+            if state == 0:  # Start
+                start = i
+
+                if cur_ch.isspace():
+                    i += 1
+                elif cur_ch.isdigit():
+                    i += 1
+                    state = 1
+                elif cur_ch.isalpha() or cur_ch == '_':
+                    i += 1
+                    state = 2
+                elif cur_ch == '\'' or cur_ch == '\"':
+                    i += 1
+                    state = 3
+                elif cur_ch == '/' and next_ch == '*':
+                    i += 2
+                    state = 4
+                elif cur_ch == '/' and next_ch == '/':
+                    i = len(text)
+                    self.setFormat(start, len(text), self.comment_color)
+                elif cur_ch == '/' and next_ch != '*':
+                    i += 1
+                    state = 5
+                else:
+                    if cur_ch not in '(){}[],.;':
+                        self.setFormat(start, 1, QColor('#099A00'))
+                    if cur_ch in '{}':
+                        #bracketPositions += i
+                        if cur_ch == '{':
+                            bracketLevel += 1
+                        else:
+                            bracketLevel -= 1
+                    i += 1
+                    state = 0
+
+            elif state == 1:  # Number
+                if cur_ch.isspace() or not cur_ch.isdigit():
+                    self.setFormat(start, i - start, self.number_color)
+                    state = 0
+                else:
+                    i += 1
+
+            elif state == 2:
+                if cur_ch.isspace() or not (cur_ch.isdigit() or cur_ch.isalpha() or cur_ch in '_-'):
+                    token = text[start:i].strip()
+                    if token in self._keywords:
+                        self.setFormat(start, i - start, self.keyword_color)
+                    elif token in self._known:
+                        self.setFormat(start, i - start, self.function_color)
+                    elif token in self._known_m:
+                        self.setFormat(start, i - start, self.constant_color)
+                    state = 0
+                else:
+                    i += 1
+
+            elif state == 3:
+                if cur_ch == text[start]:
+                    prev_ch = ''
+                    if i > 0:
+                        prev_ch = text[i - 1]
+
+                    if prev_ch != '\\':
+                        i += 1
+                        self.setFormat(start, i - start, self.string_color)
+                        state = 0
+                    else:
+                        i += 1
+                else:
+                    i += 1
+            elif state == 4:
+                if cur_ch == '*' and next_ch == '/':
+                    i += 2
+                    self.setFormat(start, i - start, self.comment_color)
+                    state = 0
+                else:
+                    i += 1
+
+            elif state == 5:
+                if cur_ch == '/':
+                    prev_ch = ''
+                    if i > 0:
+                        prev_ch = text[i - 1]
+
+                    if prev_ch != '\\':
+                        i += 1
+                        self.setFormat(start, i - start, self.string_color)
+                        state = 0
+                    else:
+                        i += 1
+                else:
+                    i += 1
             else:
-                commentLength = endIndex - startIndex + self.commentEndExpression.matchedLength(
-                )
+                state = 0
 
-            self.setFormat(startIndex, commentLength,
-                           self.multiLineCommentFormat)
-            startIndex = self.commentStartExpression.indexIn(
-                text, startIndex + commentLength)
+        if state == 4:
+            self.setFormat(start, len(text), self.comment_color)
+        else:
+            state = 0
+
+        blockState = (state & 15) | (bracketLevel << 4)
+        self.setCurrentBlockState(blockState)
 
 
 class JsCodeEditLineNums(QWidget):

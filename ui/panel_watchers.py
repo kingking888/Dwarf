@@ -14,14 +14,12 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QRect
+from PyQt5.QtCore import Qt, pyqtSignal, QRect
 from PyQt5.QtGui import (QStandardItemModel, QIcon, QPixmap, QStandardItem,
                          QPainter, QColor, QKeySequence)
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHeaderView, QHBoxLayout,
                              QPushButton, QSpacerItem, QSizePolicy, QMenu,
-                             QDialog, QLineEdit, QCheckBox, QLabel, QTreeView,
-                             QShortcut)
+                             QDialog, QLineEdit, QCheckBox, QLabel, QShortcut)
 
 import pyperclip
 from lib import utils
@@ -84,8 +82,8 @@ class AddWatcherDialog(QDialog):
         """
         if event.key() == Qt.Key_Return:
             return self.accept()
-        else:
-            return super(AddWatcherDialog, self).keyPressEvent(event)
+
+        return super().keyPressEvent(event)
 
 
 class WatchersPanel(QWidget):
@@ -110,7 +108,7 @@ class WatchersPanel(QWidget):
     onItemAdded = pyqtSignal(int, name='onItemAdded')
     onItemRemoved = pyqtSignal(int, name='onItemRemoved')
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None):  # pylint: disable=too-many-statements
         super(WatchersPanel, self).__init__(parent=parent)
         self._app_window = parent
 
@@ -230,7 +228,7 @@ class WatchersPanel(QWidget):
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************
-    def do_addwatcher_dlg(self, ptr=None):
+    def do_addwatcher_dlg(self, ptr=None):  # pylint: disable=too-many-branches
         """ Shows AddWatcherDialog
         """
         watcher_dlg = AddWatcherDialog(self, ptr)
@@ -282,7 +280,7 @@ class WatchersPanel(QWidget):
 
                 self.add_address(ptr, mem_val, from_api=False)
 
-                return [ptr, mem_val]
+                # return [ptr, mem_val]
 
     def add_address(self, ptr, flags, from_api=False):
         """ Adds Address to display
@@ -302,8 +300,8 @@ class WatchersPanel(QWidget):
         if not from_api:
             # function was called directly so add it to dwarf
             if not self._app_window.dwarf.dwarf_api('isAddressWatched', ptr):
-                return self._app_window.dwarf.dwarf_api(
-                    'addWatcher', [ptr, flags])
+                self._app_window.dwarf.dwarf_api('addWatcher', [ptr, flags])
+                return
 
         # show header
         self.list_view.setHeaderHidden(False)
@@ -344,7 +342,8 @@ class WatchersPanel(QWidget):
 
         if not from_api:
             # called somewhere so remove watcher in dwarf too
-            return self._app_window.dwarf.dwarf_api('removeWatcher', ptr)
+            self._app_window.dwarf.dwarf_api('removeWatcher', ptr)
+            return
 
         str_frmt = ''
         if self._uppercase_hex:
@@ -402,11 +401,11 @@ class WatchersPanel(QWidget):
             if data.startswith('0x'):
                 pyperclip.copy(data)
         elif isinstance(data, int):
-            sf = '0x{0:X}'
+            str_fmt = '0x{0:X}'
             if not self.uppercase_hex:
-                sf = '0x{0:x}'
+                str_fmt = '0x{0:x}'
 
-            pyperclip.copy(sf.format(data))
+            pyperclip.copy(str_fmt.format(data))
 
     def _on_item_dblclick(self, model_index):
         row = self._watchers_model.itemFromIndex(model_index).row()

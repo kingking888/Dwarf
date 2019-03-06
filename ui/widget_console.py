@@ -155,7 +155,7 @@ class QConsoleWidget(QWidget):
 
     def js_function_box(self):
         accept, what = JsEditorDialog(
-            self.parent,
+            self.app_window,
             def_text=self.function_content,
             placeholder_text='// js script with both frida and dwarf api.\n'
             '// note that it\'s evaluated. Which means, if you define a variable\n'

@@ -14,6 +14,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem
 from PyQt5.QtWidgets import QTreeView
 
@@ -160,3 +161,8 @@ class DwarfListView(QTreeView):
             return self.model().columnCount()
         else:
             return None
+
+    # override doubleclickevent to prevent doublerightclicks
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            super().mouseDoubleClickEvent(event)

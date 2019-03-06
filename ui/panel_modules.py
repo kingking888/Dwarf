@@ -295,6 +295,9 @@ class ModulesPanel(QWidget):
         """
         module_index = self.modules_list.selectionModel().currentIndex().row()
         module = self.modules_model.item(module_index, 0)  # module name
+        if module is None:
+            return
+
         imports = self._app_window.dwarf.dwarf_api('enumerateImports',
                                                    module.text())
         if imports and (imports is not None):

@@ -237,7 +237,7 @@ class EmulatorPanel(QWidget):
     def handle_clean(self):
         self.ranges_list.clear()
         self.asm_table.setRowCount(0)
-        self.memory_table.setRowCount(0)
+        # self.memory_table.setRowCount(0)
         self.console.clear()
         self.emulator.clean()
 

@@ -131,8 +131,15 @@ class AppWindow(QMainWindow):
                 QFontDatabase.addApplicationFont('assets/OpenSans-Bold.ttf')
 
         # mainwindow statusbar
+        #self.progressbar = QProgressBar()
+        #self.progressbar.setRange(0, 0)
+        # self.progressbar.setFixedHeight(15)
+        # self.progressbar.setFixedWidth(100)
+        # self.progressbar.setTextVisible(False)
+        # self.progressbar.setValue(30)
         self.statusbar = QStatusBar(self)
         self.statusbar.setAutoFillBackground(False)
+        # self.statusbar.addPermanentWidget(self.progressbar)
         self.statusbar.setObjectName("statusbar")
         self.setStatusBar(self.statusbar)
 
@@ -258,6 +265,7 @@ class AppWindow(QMainWindow):
             from ui.panel_hooks import HooksPanel
             self.hooks_dwiget = QDockWidget('Hooks', self)
             self.hooks_panel = HooksPanel(self)
+            self.hooks_panel.onShowMemoryRequest.connect(self._on_watcher_clicked)
             self.hooks_dwiget.setWidget(self.hooks_panel)
             self.hooks_dwiget.setObjectName('HooksPanel')
             self.addDockWidget(Qt.LeftDockWidgetArea, self.hooks_dwiget)
@@ -334,8 +342,10 @@ class AppWindow(QMainWindow):
             self.trace_panel = TracePanel(self)
             self.main_tabs.addTab(self.trace_panel, 'Trace')
         elif elem == 'disassembly':
-            from ui.panel_asm import AsmPanel
-            self.asm_panel = AsmPanel(self)
+            #from ui.panel_asm import AsmPanel
+            from ui.disasm_view import DisassemblyView
+            #self.asm_panel = AsmPanel(self)
+            self.asm_panel = DisassemblyView(self)
             self.main_tabs.addTab(self.asm_panel, 'Disassembly')
         elif elem == 'emulator':
             from ui.panel_emulator import EmulatorPanel
@@ -458,10 +468,6 @@ class AppWindow(QMainWindow):
         self.dwarf.onSetModules.connect(self._on_setmodules)
 
         self.dwarf.onApplyContext.connect(self._apply_context)
-        self.dwarf.onAddJavaHook.connect(self._on_add_javahook)
-        self.dwarf.onAddNativeHook.connect(self._on_add_nativehook)
-        self.dwarf.onAddOnLoadHook.connect(self._on_add_onloadhook)
-        self.dwarf.onHitOnLoad.connect(self.hooks_panel.hit_onload)
         self.dwarf.onThreadResumed.connect(self.on_tid_resumed)
 
         self.dwarf.onTraceData.connect(self._on_tracer_data)
@@ -608,7 +614,7 @@ class AppWindow(QMainWindow):
                 self._create_ui_elem('disassembly')
 
             if mem_range:
-                self.asm_panel.disasm(_range=mem_range)
+                self.asm_panel.disassemble(mem_range)
                 self.show_main_tab('disassembly')
 
     def _range_dblclicked(self, ptr):
@@ -659,14 +665,8 @@ class AppWindow(QMainWindow):
                 self.context_panel.set_context(context['ptr'], 0,
                                                context['context'])
 
-    def _on_add_nativehook(self, hook):
-        self.hooks_panel.hook_native_callback(hook)
-
-    def _on_add_javahook(self, hook):
-        self.hooks_panel.hook_java_callback(hook)
-
-    def _on_add_onloadhook(self, hook):
-        self.hooks_panel.hook_onload_callback(hook)
+    def _on_add_hook(self, hook):
+        self.hooks_panel.add_hook(hook)
 
     def _on_addmodule_hook(self, data):
         ptr, name = data

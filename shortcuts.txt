@@ -1,8 +1,11 @@
 Global Shortcuts
 ---------------------------------------------
 CTRL+W  - Add new Watcher
-CTRL+H
+CTRL+N  - New Native Hook
+CTRL+J  - New Java Hook
+CTRL+O  - New Onload Hook
 
+F4	- Thread Resume
 F5      - Process Resume
 F9      - Process Restart
 F10     - Detach

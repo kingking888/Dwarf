@@ -38,7 +38,6 @@ class Prefs(QObject):
             prefsChanged()
     """
 
-    settingChanged = pyqtSignal(str, str, name='settingChanged')
     prefsChanged = pyqtSignal(name='prefsChanged')
 
     def __init__(self):
@@ -81,5 +80,4 @@ class Prefs(QObject):
         with open(self._prefs_file, 'w') as f:
             f.write(json.dumps(self._prefs))
 
-        self.settingChanged.emit(key, value)
         self.prefsChanged.emit()

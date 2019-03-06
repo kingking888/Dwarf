@@ -20,7 +20,8 @@ from PyQt5.QtGui import QFont
 from capstone import *
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QTableWidget, QMenu, QAction, QHeaderView
+from PyQt5.QtGui import QPainter
+from PyQt5.QtWidgets import QTableWidget, QMenu, QAction, QHeaderView, QAbstractScrollArea
 
 from lib import utils
 from lib.instruction import Instruction

@@ -38,29 +38,28 @@ from ui.ui_session import SessionUi
 
 
 class Dwarf(QObject):
-
+    # script related
     onScriptLoaded = pyqtSignal(name='onScriptLoaded')
     onScriptDestroyed = pyqtSignal(name='onScriptDestroyed')
-
+    # hook related
     onAddNativeHook = pyqtSignal(Hook, name='onAddNativeHook')
     onAddJavaHook = pyqtSignal(Hook, name='onAddJavaHook')
     onAddOnLoadHook = pyqtSignal(Hook, name='onAddOnLoadHook')
-    onApplyContext = pyqtSignal(dict, name='onApplyContext')
 
-    # watcher
+    # watcher related
     onWatcherAdded = pyqtSignal(str, int, name='onWatcherAdded')
     onWatcherRemoved = pyqtSignal(str, name='onWatcherRemoved')
 
-    # ranges
+    # ranges + modules
     onSetRanges = pyqtSignal(list, name='onSetRanges')
-    # modules
     onSetModules = pyqtSignal(list, name='onSetModules')
+
     onHitOnLoad = pyqtSignal(list, name='onHitOnLoad')
-    #
     onLogToConsole = pyqtSignal(str, name='onLogToConsole')
     onTraceData = pyqtSignal(str, name='onTraceData')
     onSetData = pyqtSignal(list, name='onSetData')
     onThreadResumed = pyqtSignal(int, name='onThreadResumed')
+    onApplyContext = pyqtSignal(dict, name='onApplyContext')
 
     onEnumerateJavaMethodsComplete = pyqtSignal(list, name='onEnumerateJavaMethodsComplete')
 
@@ -99,6 +98,7 @@ class Dwarf(QObject):
         self.pointer_size = 0
         self.contexts = {}
         self.context_tid = 0
+        self.platform = ''
 
         # tracers
         self.native_traced_tid = 0
@@ -236,35 +236,6 @@ class Dwarf(QObject):
         self.load_script(script)
         return 0
 
-    def _to_ascii(self, string):
-        return "".join([
-           chr(x) if x >= 0x20 and x <= 0x7e or x == 0xff else "."
-           for x in string
-       ])
-
-    def format_data(self, data):
-        data = bytes(data)
-        pos = 0
-        formatted_data = ""
-        str_fmt = '{0:02X} '
-        while pos < len(data) - 16:
-            part = data[pos:pos + 16]
-            for i, byte in enumerate(part):
-                formatted_data += str_fmt.format(byte)
-
-            formatted_data += '\t\t\t'
-            formatted_data += self._to_ascii(data[pos:pos + 16])
-            formatted_data += '\n'
-            pos += 16
-
-        for i, byte in enumerate(data[pos:]):
-            formatted_data += str_fmt.format(byte)
-        formatted_data += '\t\t\t'
-        formatted_data += self._to_ascii(data[pos:])
-        # yield (pos, len(self.range.data) - pos, self._to_ascii(self.range.data[pos:]))
-
-        return formatted_data
-
     def on_message(self, message, data):
         if 'payload' not in message:
             print('payload: ' + message)
@@ -321,15 +292,16 @@ class Dwarf(QObject):
             # self.app_window.hooks_panel.hook_java_callback(h)
             self.onAddJavaHook.emit(h)
         elif cmd == 'hook_native_callback':
+            print()
             h = Hook(Hook.HOOK_NATIVE)
             h.set_ptr(int(parts[1], 16))
             h.set_input(self.temporary_input)
             h.set_bytes(binascii.unhexlify(parts[2]))
             self.temporary_input = ''
-            if self.native_pending_args:
-                h.set_condition(self.native_pending_args['condition'])
-                h.set_logic(self.native_pending_args['logic'])
-                self.native_pending_args = None
+            # if self.native_pending_args:
+            h.set_condition(parts[4])
+            h.set_logic(parts[3])
+            self.native_pending_args = None
             self.hooks[h.get_ptr()] = h
             # self.app_window.hooks_panel.hook_native_callback(h)
             self.onAddNativeHook.emit(h)
@@ -374,7 +346,6 @@ class Dwarf(QObject):
             self.onApplyContext.emit(data)
         elif cmd == 'set_data':
             if data:
-                formatted_data = self.format_data(data)
                 self.onSetData.emit(['raw', parts[1], data])
             else:
                 self.onSetData.emit(['plain', parts[1], str(parts[2])])
@@ -426,6 +397,7 @@ class Dwarf(QObject):
             # self.app.get_session_ui().request_session_ui_focus()
         else:
             self.arch = context_data['arch']
+            self.platform = context_data['platform']
             self.pointer_size = context_data['pointerSize']
             self.java_available = context_data['java']
             str_fmt = ('injected into := {0:d}'.format(self.pid))
@@ -516,11 +488,8 @@ class Dwarf(QObject):
             accept, input_ = InputDialog.input(self.app_window, hint='insert module name', placeholder='libtarget.so')
             if not accept:
                 return
-            if len(input) == 0:
+            if len(input_) == 0:
                 return
-
-        if not input_.endswith('.so'):
-            input_ += '.so'
 
         if input_ in self.app_window.dwarf.on_loads:
             return

@@ -38,19 +38,19 @@ class ScriptsTable(TableBaseWidget):
 
 
 class ScriptsDialog(QDialog):
-    def __init__(self, app):
-        super(ScriptsDialog, self).__init__(app)
+    def __init__(self, app_window):
+        super(ScriptsDialog, self).__init__(app_window)
 
         self.script = None
 
         self.setMinimumWidth(800)
 
         box = QVBoxLayout(self)
-        table = ScriptsTable(app, self)
+        table = ScriptsTable(app_window, self)
         table.setMinimumWidth(800)
 
-        for script_name in sorted(app.get_dwarf().get_scripts_manager().get_scripts().keys()):
-            script = app.get_dwarf().get_scripts_manager().get_script(script_name)
+        for script_name in sorted(app_window.dwarf.get_scripts_manager().get_scripts().keys()):
+            script = app_window.dwarf.get_scripts_manager().get_script(script_name)
             info = script['info']
             row = table.rowCount()
             table.insertRow(row)
@@ -74,6 +74,7 @@ class ScriptsDialog(QDialog):
                 q.setTextAlignment(Qt.AlignCenter)
                 q.setForeground(Qt.white)
                 table.setItem(row, 3, q)
+
             if 'description' in info:
                 q = NotEditableTableWidgetItem(info['description'])
                 q.setFlags(Qt.NoItemFlags)
