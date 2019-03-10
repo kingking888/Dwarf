@@ -49,6 +49,17 @@ class ConsolePanel(QTabWidget):
     def get_emu_console(self):
         return self.emu_console
 
+    def show_console_tab(self, tab_name):
+        tab_name = tab_name.join(tab_name.split()).lower()
+        if tab_name == 'javascript':
+            self.setCurrentIndex(0)
+        elif tab_name == 'python':
+            self.setCurrentIndex(1)
+        elif tab_name == 'emulator':
+            self.setCurrentIndex(2)
+        else:
+            self.setCurrentIndex(0)
+
     def js_callback(self, text):
         # the output in the logs is handled in dwarf_api
         self.parent.dwarf.dwarf_api('evaluate', text)

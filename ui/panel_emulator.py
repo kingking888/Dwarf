@@ -23,7 +23,6 @@ from ui.dialog_emulator_configs import EmulatorConfigsDialog
 from ui.dialog_input import InputDialog
 from ui.widget_console import QConsoleWidget
 from ui.widget_item_not_editable import NotEditableTableWidgetItem, NotEditableListWidgetItem
-from ui.widget_memory import QMemoryWidget
 from ui.widget_memory_address import MemoryAddressWidget
 from ui.panel_memory import MemoryPanel
 
@@ -133,14 +132,6 @@ class AsmTableWidget(QTableWidget):
 
     def on_row_inserted(self, qindex, a, b):
         self.scrollToBottom()
-
-
-class MemoryTableWidget(QMemoryWidget):
-    def __init__(self, app, *__args):
-        super().__init__(app, *__args)
-
-    def get_source_type(self):
-        return Range.SOURCE_EMULATOR
 
 
 class EmulatorPanel(QWidget):
@@ -275,6 +266,7 @@ class EmulatorPanel(QWidget):
         self.asm_table.add_hook(self.emulator, instruction)
 
     def on_emulator_log(self, log):
+        self.app.console_panel.show_console_tab('emulator')
         self.console.log(log)
 
     def on_emulator_memory_hook(self, data):

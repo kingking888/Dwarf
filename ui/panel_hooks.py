@@ -16,7 +16,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 """
 import pyperclip
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QFont, QKeySequence
+from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QFont, QKeySequence, QCursor
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QHeaderView,
                              QPushButton, QSizePolicy, QSpacerItem, QShortcut,
                              QMenu)
@@ -35,10 +35,12 @@ class HooksPanel(QWidget):
         Signals:
             onShowMemoryRequest(str) - ptr
             onHookChanged(str) - ptr
+            onHookRemoved(str) - ptr
     """
 
     onShowMemoryRequest = pyqtSignal(str, name='onShowMemoryRequest')
     onHookChanged = pyqtSignal(str, name='onHookChanged')
+    onHookRemoved = pyqtSignal(str, name='onHookRemoved')
 
     def __init__(self, parent=None):  # pylint: disable=too-many-statements
         super(HooksPanel, self).__init__(parent=parent)
@@ -62,8 +64,6 @@ class HooksPanel(QWidget):
         self._hooks_model = QStandardItemModel(0, 5)
 
         self._hooks_model.setHeaderData(0, Qt.Horizontal, 'Address')
-        self._hooks_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
-                                        Qt.TextAlignmentRole)
         self._hooks_model.setHeaderData(1, Qt.Horizontal, 'T')
         self._hooks_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter,
                                         Qt.TextAlignmentRole)
@@ -79,7 +79,7 @@ class HooksPanel(QWidget):
 
         self._hooks_list.header().setStretchLastSection(False)
         self._hooks_list.header().setSectionResizeMode(
-            0, QHeaderView.ResizeToContents)
+            0, QHeaderView.ResizeToContents | QHeaderView.Interactive)
         self._hooks_list.header().setSectionResizeMode(
             1, QHeaderView.ResizeToContents)
         self._hooks_list.header().setSectionResizeMode(2, QHeaderView.Stretch)
@@ -91,10 +91,10 @@ class HooksPanel(QWidget):
         v_box = QVBoxLayout(self)
         v_box.setContentsMargins(0, 0, 0, 0)
         v_box.addWidget(self._hooks_list)
-        header = QHeaderView(Qt.Horizontal, self)
+        #header = QHeaderView(Qt.Horizontal, self)
 
-        h_box = QHBoxLayout(header)
-        h_box.setContentsMargins(0, 0, 0, 0)
+        h_box = QHBoxLayout()
+        h_box.setContentsMargins(5, 2, 5, 5)
         icon = QIcon()
         icon.addPixmap(QPixmap(utils.resource_path('assets/icons/plus.svg')))
         self.btn1 = QPushButton(icon, '')
@@ -114,9 +114,10 @@ class HooksPanel(QWidget):
         h_box.addSpacerItem(
             QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Preferred))
         h_box.addWidget(btn3)
-        header.setLayout(h_box)
-        header.setFixedHeight(25)
-        v_box.addWidget(header)
+        # header.setLayout(h_box)
+        # header.setFixedHeight(25)
+        # v_box.addWidget(header)
+        v_box.addLayout(h_box)
         self.setLayout(v_box)
 
         self._bold_font = QFont(self._hooks_list.font())
@@ -152,13 +153,15 @@ class HooksPanel(QWidget):
         index = self._hooks_list.selectionModel().currentIndex().row()
         if index != -1:
             self._on_deletehook(index)
+            self._hooks_model.removeRow(index)
 
     def clear_list(self):
         """ Clear the List
         """
         # go through all items and tell it gets removed
         for item in range(self._hooks_model.rowCount()):
-            self._on_deletehook(item)
+            if item:
+                self._on_deletehook(item)
 
         if self._hooks_model.rowCount() > 0:
             # something was wrong it should be empty
@@ -256,6 +259,7 @@ class HooksPanel(QWidget):
         global_pt = self._hooks_list.mapToGlobal(pos)
         context_menu.exec(global_pt)
 
+    # todo: make function somewhere as it is used in different files
     def _copy_address(self, data):
         if isinstance(data, str):
             if data.startswith('0x'):
@@ -308,7 +312,7 @@ class HooksPanel(QWidget):
 
     # + button
     def _on_additem_clicked(self):
-        self.new_menu.exec_(self.btn1.mapToGlobal(self.btn1.pos()))
+        self.new_menu.exec_(QCursor.pos())
 
     # shortcuts/menu
     def _on_addnative(self):
@@ -326,6 +330,7 @@ class HooksPanel(QWidget):
             ptr = self._hooks_model.item(num_row, 0).text()
             ptr = utils.parse_ptr(ptr)
             self._app_window.dwarf.dwarf_api('deleteHook', ptr)
+            self.onHookRemoved.emit(str(ptr))
         elif hook_type == 'J':
             input_ = self._hooks_model.item(num_row, 2).data(Qt.UserRole + 2)
             self._app_window.dwarf.dwarf_api('deleteHook', input_)
@@ -336,5 +341,4 @@ class HooksPanel(QWidget):
             ptr = self._hooks_model.item(num_row, 0).text()
             ptr = utils.parse_ptr(ptr)
             self._app_window.dwarf.dwarf_api('deleteHook', ptr)
-
-        self._hooks_model.removeRow(num_row)
+            self.onHookRemoved.emit(str(ptr))

@@ -117,6 +117,7 @@ class WatchersPanel(QWidget):
             return
 
         self._uppercase_hex = True
+        self.setAutoFillBackground(True)
 
         # connect to dwarf
         self._app_window.dwarf.onWatcherAdded.connect(self._on_watcher_added)
@@ -159,10 +160,10 @@ class WatchersPanel(QWidget):
         self.list_view.customContextMenuRequested.connect(self._on_contextmenu)
 
         v_box.addWidget(self.list_view)
-        header = QHeaderView(Qt.Horizontal, self)
+        #header = QHeaderView(Qt.Horizontal, self)
 
-        h_box = QHBoxLayout(header)
-        h_box.setContentsMargins(0, 0, 0, 0)
+        h_box = QHBoxLayout()
+        h_box.setContentsMargins(5, 2, 5, 5)
         icon = QIcon()
         icon.addPixmap(QPixmap(utils.resource_path('assets/icons/plus.svg')))
         btn1 = QPushButton(icon, '')
@@ -182,9 +183,10 @@ class WatchersPanel(QWidget):
         h_box.addSpacerItem(
             QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Preferred))
         h_box.addWidget(btn3)
-        header.setLayout(h_box)
-        header.setFixedHeight(25)
-        v_box.addWidget(header)
+        # header.setLayout(h_box)
+        # header.setFixedHeight(25)
+        # v_box.addWidget(header)
+        v_box.addLayout(h_box)
 
         # create a centered dot icon
         _section_width = self.list_view.header().sectionSize(2)

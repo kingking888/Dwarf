@@ -34,7 +34,6 @@ from lib.prefs import Prefs
 from lib.scripts_manager import ScriptsManager
 from ui.dialog_input import InputDialog
 from ui.panel_trace import TraceEvent
-from ui.ui_session import SessionUi
 
 
 class Dwarf(QObject):
@@ -61,10 +60,15 @@ class Dwarf(QObject):
     onThreadResumed = pyqtSignal(int, name='onThreadResumed')
     onApplyContext = pyqtSignal(dict, name='onApplyContext')
 
+    onEnumerateJavaClassesStart = pyqtSignal(name='onEnumerateJavaClassesStart')
+    onEnumerateJavaClassesMatch = pyqtSignal(str, name='onEnumerateJavaClassesMatch')
+    onEnumerateJavaClassesComplete = pyqtSignal(name='onEnumerateJavaClassesComplete')
     onEnumerateJavaMethodsComplete = pyqtSignal(list, name='onEnumerateJavaMethodsComplete')
 
     onMemoryScanComplete = pyqtSignal(list, name='onMemoryScanComplete')
     onMemoryScanMatch = pyqtSignal(list, name='onMemoryScanMatch')
+
+    onJavaTraceEvent = pyqtSignal(list, name='onJavaTraceEvent')
 
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
@@ -196,22 +200,30 @@ class Dwarf(QObject):
             self.process.detach()
 
     def load_script(self, script=None):
-        with open('lib/script.js', 'r') as f:
-            s = f.read()
-        self.script = self.process.create_script(s)
-        self.script.on('message', self.on_message)
-        self.script.on('destroyed', self.on_destroyed)
-        self.script.load()
+        try:
+            with open('lib/script.js', 'r') as f:
+                s = f.read()
+            self.script = self.process.create_script(s)
+            self.script.on('message', self.on_message)
+            self.script.on('destroyed', self.on_destroyed)
+            self.script.load()
 
-        if script is not None:
-            user_script = ''
-            if os.path.exists(script):
-                with open(script, 'r') as script_file:
-                    user_script = script_file.read()
+            if script is not None:
+                user_script = ''
+                if os.path.exists(script):
+                    with open(script, 'r') as script_file:
+                        user_script = script_file.read()
 
-                self.dwarf_api('evaluateFunction', user_script)
+                    self.dwarf_api('evaluateFunction', user_script)
 
-        self.onScriptLoaded.emit()
+            self.onScriptLoaded.emit()
+        except frida.TimedOutError:
+            print('frida timeout')
+            self.on_destroyed()
+        except frida.TransportError:
+            print('frida transporterror')
+            self.on_destroyed()
+
         # self.app_window.on_script_loaded()
 
     def spawn(self, package, script=None):
@@ -257,24 +269,13 @@ class Dwarf(QObject):
             # on a separate thread to allow js api recursion
             Thread(target=self.emulator.api, args=(parts[1:],)).start()
         elif cmd == 'enumerate_java_classes_start':
-            if self.app.get_java_classes_panel() is not None:
-                self.app.get_java_classes_panel().on_enumeration_start()
-            if self.app.get_java_trace_panel() is not None:
-                self.app.get_java_trace_panel().on_enumeration_start()
+            self.onEnumerateJavaClassesStart.emit()
         elif cmd == 'enumerate_java_classes_match':
-            if self.app.get_java_classes_panel() is not None:
-                self.app.get_java_classes_panel().on_enumeration_match(parts[1])
-            if self.app.get_java_trace_panel() is not None:
-                self.app.get_java_trace_panel().on_enumeration_match(parts[1])
+            self.onEnumerateJavaClassesMatch.emit(parts[1])
         elif cmd == 'enumerate_java_classes_complete':
-            self.app_window.get_menu().on_java_classes_enumeration_complete()
-            if self.app.get_java_classes_panel() is not None:
-                self.app.get_java_classes_panel().on_enumeration_complete()
-            if self.app.get_java_trace_panel() is not None:
-                self.app.get_java_trace_panel().on_enumeration_complete()
+            self.onEnumerateJavaClassesComplete.emit()
         elif cmd == 'enumerate_java_methods_complete':
             self.onEnumerateJavaMethodsComplete.emit([parts[1], json.loads(parts[2])])
-            #self.bus.emit(parts[1], json.loads(parts[2]), parts[1])
         elif cmd == 'ftrace':
             if self.app.get_ftrace_panel() is not None:
                 self.app.get_ftrace_panel().append_data(parts[1])
@@ -289,7 +290,6 @@ class Dwarf(QObject):
                 h.set_logic(self.java_pending_args['logic'])
                 self.java_pending_args = None
             self.java_hooks[h.get_input()] = h
-            # self.app_window.hooks_panel.hook_java_callback(h)
             self.onAddJavaHook.emit(h)
         elif cmd == 'hook_native_callback':
             print()
@@ -298,35 +298,26 @@ class Dwarf(QObject):
             h.set_input(self.temporary_input)
             h.set_bytes(binascii.unhexlify(parts[2]))
             self.temporary_input = ''
-            # if self.native_pending_args:
             h.set_condition(parts[4])
             h.set_logic(parts[3])
             self.native_pending_args = None
             self.hooks[h.get_ptr()] = h
-            # self.app_window.hooks_panel.hook_native_callback(h)
             self.onAddNativeHook.emit(h)
         elif cmd == 'hook_onload_callback':
             h = Hook(Hook.HOOK_ONLOAD)
             h.set_ptr(0)
             h.set_input(parts[1])
-
             self.on_loads[parts[1]] = h
-            # self.app_window.hooks_panel.hook_onload_callback(h)
             self.onAddOnLoadHook.emit(h)
         elif cmd == 'java_trace':
-            panel = self.app.get_java_trace_panel()
-            if panel is None:
-                panel = self.app.get_session_ui().add_dwarf_tab(SessionUi.TAB_JAVA_TRACE)
-            panel.on_event(parts[1], parts[2], parts[3])
+            self.onJavaTraceEvent.emit(parts)
         elif cmd == 'log':
             self.log(parts[1])
         elif cmd == 'memory_scan_match':
             self.onMemoryScanMatch.emit([parts[1], parts[2], json.loads(parts[3])])
-            #self.bus.emit(parts[1], parts[2], json.loads(parts[3]))
         elif cmd == 'memory_scan_complete':
             self.app_window.get_menu().on_bytes_search_complete()
             self.onMemoryScanComplete.emit([parts[1] + ' complete', 0, 0])
-            #self.bus.emit(parts[1] + ' complete', 0, 0)
         elif cmd == 'onload_callback':
             self.loading_library = parts[1]
             str_fmt = ('Hook onload {0} @thread := {1}'.format(parts[1], parts[3]))
@@ -389,12 +380,10 @@ class Dwarf(QObject):
             else:
                 name = context_data['ptr']
             self.app_window.threads.add_context(context_data, library_onload=self.loading_library)
-            # check if data['reason'] is 0 (REASON_HOOK)
             if self.loading_library is None and context_data['reason'] == 0:
                 self.log('hook %s %s @thread := %d' % (name, sym, context_data['tid']))
-            if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
-                return
-            # self.app.get_session_ui().request_session_ui_focus()
+            # if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
+            #    return
         else:
             self.arch = context_data['arch']
             self.platform = context_data['platform']
@@ -460,24 +449,24 @@ class Dwarf(QObject):
             self.log(str(e))
             return None
 
-    def hook_java(self, input=None, pending_args=None):
-        if input is None or not isinstance(input, str):
-            accept, input = InputDialog.input(
+    def hook_java(self, input_=None, pending_args=None):
+        if input_ is None or not isinstance(input_, str):
+            accept, input_ = InputDialog.input(
                 self.app_window, hint='insert java class or methos',
                 placeholder='com.package.class or com.package.class.method')
             if not accept:
                 return
         self.java_pending_args = pending_args
-        input = input.replace(' ', '')
-        self.dwarf_api('hookJava', input)
+        input_ = input_.replace(' ', '')
+        self.dwarf_api('hookJava', input_)
 
-    def hook_native(self, input=None, pending_args=None, own_input=None):
-        if input is None or not isinstance(input, str):
-            ptr, input = InputDialog.input_pointer(self.app_window)
+    def hook_native(self, input_=None, pending_args=None, own_input=None):
+        if input_ is None or not isinstance(input_, str):
+            ptr, input_ = InputDialog.input_pointer(self.app_window)
         else:
-            ptr = utils.parse_ptr(self.app_window.dwarf.dwarf_api('evaluatePtr', input))
+            ptr = utils.parse_ptr(self.app_window.dwarf.dwarf_api('evaluatePtr', input_))
         if ptr > 0:
-            self.temporary_input = input
+            self.temporary_input = input_
             if own_input is not None:
                 self.temporary_input = own_input
             self.native_pending_args = pending_args

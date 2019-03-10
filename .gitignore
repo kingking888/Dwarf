@@ -10,6 +10,7 @@ Dwarf.iml
 .git_cache
 tools
 .decompile
+.tmp
 .vscode
 *.patch
 desktop.ini

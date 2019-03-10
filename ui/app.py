@@ -15,7 +15,6 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
 import os
-import threading
 
 import frida
 
@@ -28,7 +27,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *  # QIcon, QFontDatabase
 from PyQt5.QtWidgets import *
 
-from ui.ui_session import SessionUi
 from ui.ui_welcome import WelcomeUi
 
 from lib.session_manager import SessionManager
@@ -61,7 +59,8 @@ class AppWindow(QMainWindow):
         self.emulator_panel = None
         self.ftrace_panel = None
         self.hooks_panel = None
-        self.java_class_panel = None
+        self.smali_panel = None
+        self.java_inspector_panel = None
         self.java_explorer_panel = None
         self.java_trace_panel = None
         self.memory_panel = None
@@ -130,16 +129,24 @@ class AppWindow(QMainWindow):
             if os.path.exists(utils.resource_path('assets/OpenSans-Bold.ttf')):
                 QFontDatabase.addApplicationFont('assets/OpenSans-Bold.ttf')
 
+        if os.path.exists('.tmp'):
+            for root, dirs, files in os.walk('.tmp', topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(root)
         # mainwindow statusbar
-        #self.progressbar = QProgressBar()
-        #self.progressbar.setRange(0, 0)
-        # self.progressbar.setFixedHeight(15)
-        # self.progressbar.setFixedWidth(100)
-        # self.progressbar.setTextVisible(False)
-        # self.progressbar.setValue(30)
+        self.progressbar = QProgressBar()
+        self.progressbar.setRange(0, 0)
+        self.progressbar.setVisible(False)
+        self.progressbar.setFixedHeight(15)
+        self.progressbar.setFixedWidth(100)
+        self.progressbar.setTextVisible(False)
+        self.progressbar.setValue(30)
         self.statusbar = QStatusBar(self)
         self.statusbar.setAutoFillBackground(False)
-        # self.statusbar.addPermanentWidget(self.progressbar)
+        self.statusbar.addPermanentWidget(self.progressbar)
         self.statusbar.setObjectName("statusbar")
         self.setStatusBar(self.statusbar)
 
@@ -226,6 +233,12 @@ class AppWindow(QMainWindow):
             index = self.main_tabs.indexOf(self.data_panel)
         elif name == 'emulator':
             index = self.main_tabs.indexOf(self.emulator_panel)
+        elif name == 'java-trace':
+            index = self.main_tabs.indexOf(self.java_trace_panel)
+        elif name == 'java-inspector':
+            index = self.main_tabs.indexOf(self.java_inspector_panel)
+        elif name == 'smali':
+            index = self.main_tabs.indexOf(self.smali_panel)
 
         self.main_tabs.setCurrentIndex(index)
 
@@ -266,6 +279,7 @@ class AppWindow(QMainWindow):
             self.hooks_dwiget = QDockWidget('Hooks', self)
             self.hooks_panel = HooksPanel(self)
             self.hooks_panel.onShowMemoryRequest.connect(self._on_watcher_clicked)
+            self.hooks_panel.onHookRemoved.connect(self._on_hook_removed)
             self.hooks_dwiget.setWidget(self.hooks_panel)
             self.hooks_dwiget.setObjectName('HooksPanel')
             self.addDockWidget(Qt.LeftDockWidgetArea, self.hooks_dwiget)
@@ -289,9 +303,11 @@ class AppWindow(QMainWindow):
         elif elem == 'javaexplorer':
             from ui.panel_java_explorer import JavaExplorerPanel
             self.java_explorer_panel = JavaExplorerPanel(self)
-            # self.java_explorer_panel.hide()
             self.main_tabs.addTab(self.java_explorer_panel, 'JavaExplorer')
-            # box.addWidget(self.java_explorer_panel)
+        elif elem == 'java-inspector':
+            from ui.panel_java_inspector import JavaInspector
+            self.java_inspector_panel = JavaInspector(self)
+            self.main_tabs.addTab(self.java_inspector_panel, 'Java Inspector')
         elif elem == 'console':
             from ui.panel_console import ConsolePanel
             self.console_dock = QDockWidget('Console', self)
@@ -351,6 +367,14 @@ class AppWindow(QMainWindow):
             from ui.panel_emulator import EmulatorPanel
             self.emulator_panel = EmulatorPanel(self)
             self.main_tabs.addTab(self.emulator_panel, 'Emulator')
+        elif elem == 'java-trace':
+            from ui.panel_java_trace import JavaTracePanel
+            self.java_trace_panel = JavaTracePanel(self)
+            self.main_tabs.addTab(self.java_trace_panel, 'Java-Trace')
+        elif elem == 'smali':
+            from ui.panel_smali import SmaliPanel
+            self.smali_panel = SmaliPanel()
+            self.main_tabs.addTab(self.smali_panel, 'Smali')
         else:
             print('no handler for elem: ' + elem)
 
@@ -367,8 +391,8 @@ class AppWindow(QMainWindow):
             try:
                 _app = QApplication.instance()
                 with open(theme_style) as stylesheet:
-                    _app.setStyleSheet(_app.styleSheet() + '\n'
-                                       + stylesheet.read())
+                    _app.setStyleSheet(_app.styleSheet() + '\n' +
+                                       stylesheet.read())
             except Exception as e:
                 pass
                 #err = self.dwarf.spawn(dwarf_args.package, dwarf_args.script)
@@ -412,8 +436,8 @@ class AppWindow(QMainWindow):
         return self.hooks_panel
 
     @property
-    def java_class(self):
-        return self.java_class_panel
+    def java_inspector(self):
+        return self.java_inspector_panel
 
     @property
     def java_explorer(self):
@@ -467,6 +491,7 @@ class AppWindow(QMainWindow):
         self.dwarf.onSetRanges.connect(self._on_setranges)
         self.dwarf.onSetModules.connect(self._on_setmodules)
 
+        self.dwarf.onAddNativeHook.connect(self._on_add_hook)
         self.dwarf.onApplyContext.connect(self._apply_context)
         self.dwarf.onThreadResumed.connect(self.on_tid_resumed)
 
@@ -563,8 +588,16 @@ class AppWindow(QMainWindow):
         """ Address in Watcherpanel was clicked
             show Memory
         """
-        self.memory_panel.read_memory(ptr=ptr)
-        self.show_main_tab('memory')
+        if '.' in ptr:  # java_hook
+            file_path = ptr.replace('.', os.path.sep)
+            if os.path.exists('.tmp/smali/' + file_path + '.smali'):
+                if self.smali_panel is None:
+                    self._create_ui_elem('smali')
+                self.smali_panel.set_file('.tmp/smali/' + file_path + '.smali')
+                self.show_main_tab('smali')
+        else:
+            self.memory_panel.read_memory(ptr=ptr)
+            self.show_main_tab('memory')
 
     def _on_watcher_added(self, ptr):
         """ Watcher Entry was added
@@ -666,7 +699,18 @@ class AppWindow(QMainWindow):
                                                context['context'])
 
     def _on_add_hook(self, hook):
-        self.hooks_panel.add_hook(hook)
+        try:
+            # set highlight
+            ptr = hook.get_ptr()
+            ptr = utils.parse_ptr(ptr)
+            self.memory_panel.add_highlight(
+                HighLight('hook', ptr, self.dwarf.pointer_size))
+        except HighlightExistsError:
+            pass
+
+    def _on_hook_removed(self, ptr):
+        ptr = utils.parse_ptr(ptr)
+        self.memory_panel.remove_highlight(ptr)
 
     def _on_addmodule_hook(self, data):
         ptr, name = data
@@ -715,3 +759,11 @@ class AppWindow(QMainWindow):
         if self.data_panel is not None:
             self.show_main_tab('Data')
             self.data_panel.append_data(data[0], data[1], data[2])
+
+    def show_progress(self, text):
+        self.progressbar.setVisible(True)
+        self.set_status_text(text)
+
+    def hide_progress(self):
+        self.progressbar.setVisible(False)
+        self.set_status_text('')

@@ -1729,8 +1729,6 @@ class HexEditor(QAbstractScrollArea):
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.HighQualityAntialiasing)
 
-        # self.so.
-
         # fill background
         painter.fillRect(self.viewport().rect(),
                          self._ctrl_colors['background'])

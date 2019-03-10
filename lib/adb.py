@@ -222,7 +222,10 @@ class Adb(object):
             if result == '':
                 result = None
 
-        return result
+        if result is not None:
+            return result.join(result.split())
+        else:
+            return result
 
     def kill_package(self, package):
         if not self._adb_available:
@@ -252,6 +255,22 @@ class Adb(object):
             ret.append(p)
         return ret
 
+    def package_path(self, package_name):
+        if not self.is_available():
+            return None
+
+        _path = self._do_adb_command('adb shell pm path ' + package_name)
+        if _path:
+            try:
+                _path = _path.join(_path.split())  # remove \r\n
+                _path = _path.split(':')
+                if len(_path) == 2 and _path[0] == 'package':
+                    return _path[1]
+            except:
+                pass
+
+        return None
+
     def mount_system(self):
         if not self._adb_available:
             return None
@@ -272,8 +291,8 @@ class Adb(object):
     def pull(self, path, dest):
         if not self._adb_available:
             return None
-
-        self._do_adb_command('adb pull %s %s' % (path, dest))
+        if path and dest:
+            self._do_adb_command('adb pull %s %s' % (path, dest))
 
     def push(self, path, dest):
         if not self._adb_available:

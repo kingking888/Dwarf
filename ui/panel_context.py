@@ -40,6 +40,7 @@ class ContextPanel(QTabWidget):
         super(ContextPanel, self).__init__(parent=parent)
 
         self._app_window = parent
+        self.setAutoFillBackground(True)
 
         self._nativectx_model = QStandardItemModel(0, 4)
         self._nativectx_model.setHeaderData(0, Qt.Horizontal, 'Reg')
@@ -100,6 +101,9 @@ class ContextPanel(QTabWidget):
 
         self._javactx_list.setContextMenuPolicy(Qt.CustomContextMenu)
         self._javactx_list.customContextMenuRequested.connect(self._on_java_contextmenu)
+
+        self.addTab(self._nativectx_list, 'Native')
+        self.show_context_tab('Native')
 
     # ************************************************************************
     # **************************** Functions *********************************
@@ -232,6 +236,31 @@ class ContextPanel(QTabWidget):
                     value_dec.setText('{0:d}'.format(context[register]))
 
             self._emulatorctx_model.appendRow([reg_name, value_x, value_dec])
+
+    def _set_java_context(self, ptr, context):
+        if self.indexOf(self._javactx_list) == -1:
+            self.addTab(self._javactx_list, 'Java')
+            self.show_context_tab('Java')
+        else:
+            self.show_context_tab('Java')
+
+        context_ptr = ptr
+
+        for arg in context:
+            _arg = QStandardItem()
+            _arg.setText(arg)
+
+            _class = QStandardItem()
+            _class.setText(context[arg]['className'])
+            if isinstance(context[arg]['handle'], str):
+                _class.setForeground(Qt.lightGray)
+
+            _value = QStandardItem()
+            if context[arg] is not None:
+                _value.setText('null')
+                _value.setForeground(Qt.gray)
+
+            self._javactx_model.appendRow([_arg, _class, _value])
 
     # ************************************************************************
     # **************************** Handlers **********************************

@@ -11,6 +11,10 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
+import os
+import json
+
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
 
 from lib.session import Session
@@ -25,6 +29,40 @@ from ui.widget_item_not_editable import NotEditableListWidgetItem
 
 from ui.device_window import DeviceWindow
 from ui.apk_list import ApkListDialog
+from lib import utils
+
+
+class SmaliThread(QThread):
+    onFinished = pyqtSignal(name='onFinished')
+    onError = pyqtSignal(name='onError')
+
+    def __init__(self, parent=None, package_name=None):
+        super(SmaliThread, self).__init__(parent)
+        self._adb = Adb()
+        self._package_name = package_name
+        if not self._adb.is_available():
+            return
+
+    def run(self):
+        if not self._adb.is_available():
+            self.onError.emit()
+            return
+
+        if not self._package_name:
+            self.onError.emit()
+            return
+
+        _path = self._adb.package_path(self._package_name)
+        if not os.path.exists('.tmp'):
+            os.mkdir('.tmp')
+
+        if _path:
+            self._adb.pull(_path, '.tmp/base.apk')
+            if os.path.exists('.tmp/base.apk'):
+                utils.do_shell_command('d2j-baksmali.bat .tmp/base.apk -o .tmp/smali')
+                self.onFinished.emit()
+
+        self.onError.emit()
 
 
 class AndroidSession(Session):
@@ -60,7 +98,7 @@ class AndroidSession(Session):
     @property
     def session_ui_sections(self):
         # what sections we want in session_ui
-        return ['hooks', 'threads', 'registers', 'memory', 'console', 'watchers', 'javaexplorer']
+        return ['hooks', 'threads', 'registers', 'memory', 'console', 'watchers']
 
     @property
     def session_type(self):
@@ -101,6 +139,19 @@ class AndroidSession(Session):
 
         self._menu.append(file_menu)
 
+        process_menu = QMenu('&Process')
+        process_menu.addAction('Resume', self._on_proc_resume, Qt.Key_F5)
+        process_menu.addAction('Restart', self._on_proc_restart, Qt.Key_F9)
+        process_menu.addAction('Detach', self._on_detach, Qt.Key_F10)
+
+        self._menu.append(process_menu)
+
+        java_menu = QMenu('&Java')
+        java_menu.addAction('Trace', self._on_java_trace)
+        java_menu.addSeparator()
+        java_menu.addAction('Classes', self._on_java_classes)
+        self._menu.append(java_menu)
+
         # additional menus
         #device_menu = QMenu('&Device')
         # self._menu.append(device_menu)
@@ -116,6 +167,7 @@ class AndroidSession(Session):
         if args.package is None:
             self._device_window.setModal(True)
             self._device_window.onSelectedProcess.connect(self.on_proc_selected)
+            self._device_window.onSpwanSelected.connect(self.on_spawn_selected)
             self._device_window.show()
         else:
             if not args.spawn:
@@ -133,6 +185,10 @@ class AndroidSession(Session):
                     exit(ret_val)
 
     def decompile_apk(self):
+        apk_dlg = ApkListDialog(self._app_window)
+        apk_dlg.onApkSelected.connect(self._decompile_package)
+        apk_dlg.show()
+        """
         packages = self.adb.list_packages()
         if packages:
             accept, items = ListDialog.build_and_show(
@@ -142,7 +198,13 @@ class AndroidSession(Session):
             if accept:
                 if len(items) > 0:
                     path = items[0].get_apk_path()
-                    AndroidDecompileUtil.decompile(self.adb, path)
+                    AndroidDecompileUtil.decompile(self.adb, path)"""
+
+    def _decompile_package(self, data):
+        package, path = data
+        if path is not None:
+            # todo: make qthread
+            AndroidDecompileUtil.decompile(self.adb, path)
 
     def save_apk(self):
         apk_dlg = ApkListDialog(self._app_window)
@@ -156,6 +218,59 @@ class AndroidSession(Session):
             if result and result[0]:
                 self.adb.pull(path, result[0])
 
-    def on_proc_selected(self, pid):
+    def on_proc_selected(self, data):
+        device, pid = data
+        if device:
+            self.dwarf.device = device
         if pid:
             self.dwarf.attach(pid)
+
+    def on_spawn_selected(self, data):
+        device, package_name = data
+        if device:
+            self.dwarf.device = device
+        if package_name:
+            if self.dwarf.spawn(package=package_name):
+                self.stop()
+
+            # smalistuff
+            self._app_window.show_progress('Baksmali ' + package_name + ' ...')
+            _smali_thread = SmaliThread(self, package_name)
+            _smali_thread.onFinished.connect(self._app_window.hide_progress)
+            _smali_thread.start()
+
+            self._on_java_classes()
+
+    def _on_proc_resume(self, tid=0):
+        if tid == 0:
+            self._app_window.contexts_list_panel.clear()
+            self._app_window.context_panel.clear()
+            # self._app_window.backtrace_panel.setRowCount(0)
+            self._app_window.memory_panel.clear_panel()
+            self.dwarf.contexts.clear()
+
+        self.dwarf.dwarf_api('release', tid)
+
+    def _on_proc_restart(self):
+        self.dwarf.dwarf_api('restart')
+        self._on_proc_resume()
+
+    def _on_detach(self):
+        self.dwarf.detach()
+
+    def _on_java_trace(self):
+        should_request_classes = self._app_window.java_trace_panel is None
+        if self._app_window.java_trace_panel is None:
+            self._app_window._create_ui_elem('java-trace')
+
+        self._app_window.show_main_tab('java-trace')
+        if should_request_classes:
+            self.dwarf.dwarf_api('enumerateJavaClasses')
+
+    def _on_java_classes(self):
+        #should_request_classes = self._app_window.java is None
+        if self._app_window.java_inspector_panel is None:
+            self._app_window._create_ui_elem('java-inspector')
+
+        self._app_window.show_main_tab('java-inspector')
+        self.dwarf.dwarf_api('enumerateJavaClasses')

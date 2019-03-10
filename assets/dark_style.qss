@@ -2,7 +2,7 @@
     color: #666;
 }
 
-QObject, QWidget, QFrame , QMenuBar, QScrollArea, QMainWindow::separator, QHeaderView::section  {
+QObject, QWidget, QFrame , QMenuBar, QScrollArea, QMainWindow::separator, QHeaderView::section {
     background-color: #212121;
     color: #666;
     border: none;
@@ -286,28 +286,28 @@ QMenu {
 
 QHeaderView::section {
     padding: 0 10px;
-    /*border-right: 1px solid #181818;
-    border-top: 1px solid #181818;*/
     border: 1px solid #181818;
     border-right: none;
     text-align: left;
     text-transform: uppercase;
     color: #666;
     font-weight: bold;
-    /*background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #333, stop:1 #222);*/
+}
+
+QHeaderView::section:last {
+    border-right: 1px solid #181818;
 }
 
 QTabWidget QFrame{
     border: 0;
-    background: #181818;
 }
-
 
 QTabWidget::pane {
     border-radius: 2px;
     padding: 0px;
     margin: 0px;
 }
+
 /*
 QTabWidget::pane:selected {
     background-color: transparent;
@@ -334,9 +334,10 @@ HexEditor {
     qproperty-bytealt: #444;
 }
 
-QHeaderView::section:first {
+QHeaderView::section:first, QHeaderView::section:only-one {
     color: #ef5350;
 }
+
 
 QCheckBox {
     spacing: 5px;

@@ -16,7 +16,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 """
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QStandardItem
-from PyQt5.QtWidgets import QTreeView
+from PyQt5.QtWidgets import QTreeView, QHeaderView
 
 from lib.prefs import Prefs
 
@@ -166,3 +166,14 @@ class DwarfListView(QTreeView):
     def mouseDoubleClickEvent(self, event):
         if event.button() == Qt.LeftButton:
             super().mouseDoubleClickEvent(event)
+
+    def resizeEvent(self, event):
+        super(DwarfListView, self).resizeEvent(event)
+        header = self.header()
+        if header:
+            for column in range(header.count()):
+                if header.sectionResizeMode(column) == (QHeaderView.ResizeToContents | QHeaderView.Interactive):
+                    header.setSectionResizeMode(column, QHeaderView.ResizeToContents)
+                    width = header.sectionSize(column)
+                    header.setSectionResizeMode(column, QHeaderView.Interactive)
+                    header.resizeSection(column, width)

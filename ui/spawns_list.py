@@ -23,17 +23,15 @@ from PyQt5.QtWidgets import QWidget, QHeaderView, QVBoxLayout, QPushButton
 from ui.list_view import DwarfListView
 
 
-class ProcsThread(QThread):
-    """ Updates Processlist
-
-        Signals:
-            add_proc(dict)
-            is_error(str)
-            is_finished()
-
+class SpawnsThread(QThread):
+    """ Updates the SpawnsList
+        signals:
+            clear_proc()
+            add_spawn(NotEditableListWidgetItem)
+            is_error(str) - shows str in statusbar
         device must set before run
     """
-    add_proc = pyqtSignal(dict)
+    add_spawn = pyqtSignal(list)
     is_error = pyqtSignal(str)
     is_finished = pyqtSignal()
 
@@ -45,31 +43,24 @@ class ProcsThread(QThread):
             self.device = device
 
     def run(self):
-        """ run
-        """
         if self.device is not None:
-            if isinstance(self.device, frida.core.Device):
-                try:
-                    procs = self.device.enumerate_processes()
-
-                    for proc in procs:
-                        proc_item = {'pid': proc.pid, 'name': proc.name}
-                        self.add_proc.emit(proc_item)
-                # ServerNotRunningError('unable to connect to remote frida-server: closed')
-                except frida.ServerNotRunningError:
-                    self.is_error.emit(
-                        'Frida ServerNotRunningError: Server not running')
-                except frida.TransportError:
-                    self.is_error.emit('Frida TransportError: Server closed')
-                except frida.TimedOutError:
-                    self.is_error.emit('Frida TimedOutError: Server timedout')
-                except Exception:  # pylint: disable=broad-except
-                    self.is_error.emit('something was wrong...')
+            try:
+                apps = self.device.enumerate_applications()
+                for app in sorted(apps, key=lambda x: x.name):
+                    self.add_spawn.emit([app.name, app.identifier])
+            except frida.ServerNotRunningError:
+                self.is_error.emit('unable to connect to remote frida server: not started')
+            except frida.TransportError:
+                self.is_error.emit('unable to connect to remote frida server: closed')
+            except frida.TimedOutError:
+                self.is_error.emit('unable to connect to remote frida server: timedout')
+            except Exception:
+                self.is_error.emit('something was wrong...')
 
         self.is_finished.emit()
 
 
-class ProcessList(QWidget):
+class SpawnsList(QWidget):
     """ ProcessListWidget wich shows running Processes on Device
         Includes a Refresh Button to manually start refreshthread
 
@@ -85,7 +76,7 @@ class ProcessList(QWidget):
     onRefreshError = pyqtSignal(str, name='onRefreshError')
 
     def __init__(self, device, parent=None):
-        super(ProcessList, self).__init__(parent=parent)
+        super(SpawnsList, self).__init__(parent=parent)
 
         # if not isinstance(device, frida.core.Device):
         #    print('No FridaDevice')
@@ -93,35 +84,33 @@ class ProcessList(QWidget):
 
         self._device = device
 
-        self.process_list = DwarfListView()
+        self.spawn_list = DwarfListView()
 
         model = QStandardItemModel(0, 2, parent)
-        model.setHeaderData(0, Qt.Horizontal, "PID")
-        model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
-                            Qt.TextAlignmentRole)
-        model.setHeaderData(1, Qt.Horizontal, "Name")
+        model.setHeaderData(0, Qt.Horizontal, "Name")
+        model.setHeaderData(1, Qt.Horizontal, "Package")
 
-        self.process_list.doubleClicked.connect(self._on_item_clicked)
+        self.spawn_list.doubleClicked.connect(self._on_item_clicked)
 
         v_box = QVBoxLayout()
         v_box.setContentsMargins(0, 0, 0, 0)
-        v_box.addWidget(self.process_list)
+        v_box.addWidget(self.spawn_list)
         self.refresh_button = QPushButton('Refresh')
         self.refresh_button.clicked.connect(self._on_refresh_procs)
         self.refresh_button.setEnabled(False)
         v_box.addWidget(self.refresh_button)
         self.setLayout(v_box)
 
-        self.process_list.setModel(model)
-        self.process_list.header().setSectionResizeMode(
+        self.spawn_list.setModel(model)
+        self.spawn_list.header().setSectionResizeMode(
             0, QHeaderView.ResizeToContents)
 
-        self.procs_update_thread = ProcsThread(self, self._device)
-        self.procs_update_thread.add_proc.connect(self._on_add_proc)
-        self.procs_update_thread.is_error.connect(self._on_error)
-        self.procs_update_thread.is_finished.connect(self._on_refresh_finished)
-        self.procs_update_thread.device = self._device
-        self.procs_update_thread.start()
+        self.spaw_update_thread = SpawnsThread(self, self._device)
+        self.spaw_update_thread.add_spawn.connect(self._on_add_proc)
+        self.spaw_update_thread.is_error.connect(self._on_error)
+        self.spaw_update_thread.is_finished.connect(self._on_refresh_finished)
+        self.spaw_update_thread.device = self._device
+        self.spaw_update_thread.start()
 
     # ************************************************************************
     # **************************** Properties ********************************
@@ -142,37 +131,37 @@ class ProcessList(QWidget):
     def clear(self):
         """ Clears the List
         """
-        self.process_list.clear()
+        self.spawn_list.clear()
 
     def set_device(self, device):
         """ Set frida Device
         """
         if isinstance(device, frida.core.Device):
             self._device = device
-            self.procs_update_thread.device = device
+            self.spaw_update_thread.device = device
             self._on_refresh_procs()
 
     # ************************************************************************
     # **************************** Handlers **********************************
     # ************************************************************************
     def _on_item_clicked(self, model_index):
-        model = self.process_list.model()
+        model = self.spawn_list.model()
 
         index = model.itemFromIndex(model_index).row()
 
         if index != -1:
-            sel_pid = self.process_list.get_item_text(index, 0)
-            sel_name = self.process_list.get_item_text(index, 1)
-            self.onProcessSelected.emit([int(sel_pid), sel_name])
+            sel_pid = self.spawn_list.get_item_text(index, 0)
+            sel_name = model.data(model_index, Qt.UserRole + 2)
+            self.onProcessSelected.emit([sel_pid, sel_name])
 
     def _on_add_proc(self, item):
-        model = self.process_list.model()
-        pid = QStandardItem()
-        pid.setText(str(item['pid']))
-        pid.setTextAlignment(Qt.AlignCenter)
+        model = self.spawn_list.model()
         name = QStandardItem()
-        name.setText(item['name'])
-        model.appendRow([pid, name])
+        name.setText(item[0])
+        name.setData(item[1], Qt.UserRole + 2)
+        package = QStandardItem()
+        package.setText(item[1])
+        model.appendRow([name, package])
 
     def _on_error(self, error_str):
         self.onRefreshError.emit(error_str)
@@ -181,11 +170,11 @@ class ProcessList(QWidget):
         if not self._device:
             return
 
-        if not self.procs_update_thread.isRunning():
+        if not self.spaw_update_thread.isRunning():
             self.clear()
             self.refresh_button.setEnabled(False)
-            self.procs_update_thread.device = self._device
-            self.procs_update_thread.start()
+            self.spaw_update_thread.device = self._device
+            self.spaw_update_thread.start()
 
     def _on_refresh_finished(self):
         self.refresh_button.setEnabled(True)
