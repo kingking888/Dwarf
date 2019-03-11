@@ -1249,8 +1249,7 @@ class HexEditor(QAbstractScrollArea):
                     else:
                         txt = '0x{0:08X}'.format(index + self.base)
                     if txt:
-                        copy_addr = context_menu.addAction(txt)
-                        menu_actions[copy_addr] = pyperclip.copy(txt)
+                        context_menu.addAction(txt, lambda: utils.copy_hex_to_clipboard(txt))
                         context_menu.addSeparator()
 
             asm_view = context_menu.addAction("&Disassemble")

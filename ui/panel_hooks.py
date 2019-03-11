@@ -14,9 +14,9 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-import pyperclip
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon, QPixmap, QFont, QKeySequence, QCursor
+from PyQt5.QtGui import (QStandardItemModel, QStandardItem, QIcon, QPixmap,
+                         QFont, QKeySequence, QCursor)
 from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QHeaderView,
                              QPushButton, QSizePolicy, QSpacerItem, QShortcut,
                              QMenu)
@@ -196,7 +196,7 @@ class HooksPanel(QWidget):
             str_fmt = '0x{0:x}'
             if self._hooks_list.uppercase_hex:
                 str_fmt = '0x{0:X}'
-            addr.setTextAlignment(Qt.AlignCenter)
+            # addr.setTextAlignment(Qt.AlignCenter)
             addr.setText(str_fmt.format(hook.get_ptr()))
 
         inp = QStandardItem()
@@ -246,7 +246,7 @@ class HooksPanel(QWidget):
         index = self._hooks_list.indexAt(pos).row()
         if index != -1:
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self._hooks_model.item(index, 0).text()))
             context_menu.addSeparator()
             context_menu.addAction(
@@ -258,18 +258,6 @@ class HooksPanel(QWidget):
                 'Delete Hook', lambda: self._on_deletehook(index))
         global_pt = self._hooks_list.mapToGlobal(pos)
         context_menu.exec(global_pt)
-
-    # todo: make function somewhere as it is used in different files
-    def _copy_address(self, data):
-        if isinstance(data, str):
-            if data.startswith('0x'):
-                pyperclip.copy(data)
-        elif isinstance(data, int):
-            str_fmt = '0x{0:X}'
-            if not self.uppercase_hex:
-                str_fmt = '0x{0:x}'
-
-            pyperclip.copy(str_fmt.format(data))
 
     def _on_modify_logic(self, num_row):
         item = self._hooks_model.item(num_row, 3)

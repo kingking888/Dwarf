@@ -21,7 +21,6 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHeaderView, QHBoxLayout,
                              QPushButton, QSpacerItem, QSizePolicy, QMenu,
                              QDialog, QLineEdit, QCheckBox, QLabel, QShortcut)
 
-import pyperclip
 from lib import utils
 from ui.list_view import DwarfListView
 
@@ -391,23 +390,12 @@ class WatchersPanel(QWidget):
             glbl_pt = self.list_view.mapToGlobal(pos)
             context_menu = QMenu(self)
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self._watchers_model.item(index, 0).text()))
             context_menu.addAction(
                 'Delete Address', lambda: self.remove_address(
                     self._watchers_model.item(index, 0).text()))
             context_menu.exec_(glbl_pt)
-
-    def _copy_address(self, data):
-        if isinstance(data, str):
-            if data.startswith('0x'):
-                pyperclip.copy(data)
-        elif isinstance(data, int):
-            str_fmt = '0x{0:X}'
-            if not self.uppercase_hex:
-                str_fmt = '0x{0:x}'
-
-            pyperclip.copy(str_fmt.format(data))
 
     def _on_item_dblclick(self, model_index):
         row = self._watchers_model.itemFromIndex(model_index).row()

@@ -43,6 +43,8 @@ class SpawnsThread(QThread):
             self.device = device
 
     def run(self):
+        """ thread func
+        """
         if self.device is not None:
             try:
                 apps = self.device.enumerate_applications()
@@ -54,7 +56,7 @@ class SpawnsThread(QThread):
                 self.is_error.emit('unable to connect to remote frida server: closed')
             except frida.TimedOutError:
                 self.is_error.emit('unable to connect to remote frida server: timedout')
-            except Exception:
+            except Exception:  # pylint: disable=broad-except
                 self.is_error.emit('something was wrong...')
 
         self.is_finished.emit()
@@ -151,7 +153,10 @@ class SpawnsList(QWidget):
 
         if index != -1:
             sel_pid = self.spawn_list.get_item_text(index, 0)
-            sel_name = model.data(model_index, Qt.UserRole + 2)
+            if model_index.column() == 0:
+                sel_name = model.data(model_index, Qt.UserRole + 2)
+            else:
+                sel_name = self.spawn_list.get_item_text(index, 1)
             self.onProcessSelected.emit([sel_pid, sel_name])
 
     def _on_add_proc(self, item):
@@ -177,4 +182,5 @@ class SpawnsList(QWidget):
             self.spaw_update_thread.start()
 
     def _on_refresh_finished(self):
+        self.spawn_list.resizeColumnToContents(0)
         self.refresh_button.setEnabled(True)

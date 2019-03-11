@@ -18,11 +18,16 @@ import os
 import subprocess
 import sys
 
+import pyperclip
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtWidgets import QMessageBox
 
+from lib.prefs import Prefs
+
 VERSION = sys.version_info
+
 
 def do_shell_command(cmd, timeout=60):
     """ Execute cmd
@@ -95,6 +100,7 @@ def show_message_box(text, details=None):
     msg.setStandardButtons(QMessageBox.Ok)
     msg.exec_()
 
+
 def get_os_monospace_font():
     """ Get MonospaceFont for OS
     """
@@ -108,6 +114,34 @@ def get_os_monospace_font():
         return QFont('Bitstream Vera Sans Mono', 10)
     else:
         # windows
-        return QFont('Courier', 10) # Consolas ??
+        return QFont('Courier', 10)  # Consolas ??
 
-    #return QFontDatabase.systemFont(QFontDatabase.FixedFont) ??
+    # return QFontDatabase.systemFont(QFontDatabase.FixedFont) ??
+
+
+def copy_str_to_clipboard(text):
+    """ Helper for copying text
+    """
+    if isinstance(text, str):
+        pyperclip.copy(text)
+
+
+def copy_hex_to_clipboard(hex_str):
+    """ Helper for copying hexstr in prefered style
+    """
+    _prefs = Prefs()
+    uppercase = (_prefs.get('dwarf_ui_hexstyle', 'upper').lower() == 'upper')
+    if isinstance(hex_str, str):
+        if hex_str.startswith('0x'):
+            if uppercase:
+                hex_str = hex_str.upper().replace('0X', '0x')
+            else:
+                hex_str = hex_str.lower()
+
+            pyperclip.copy(hex_str)
+    elif isinstance(hex_str, int):
+        str_fmt = '0x{0:x}'
+        if uppercase:
+            str_fmt = '0x{0:X}'
+
+        pyperclip.copy(str_fmt.format(hex_str))

@@ -40,11 +40,11 @@ class SmaliThread(QThread):
         super(SmaliThread, self).__init__(parent)
         self._adb = Adb()
         self._package_name = package_name
-        if not self._adb.is_available():
+        if not self._adb.available():
             return
 
     def run(self):
-        if not self._adb.is_available():
+        if not self._adb.available():
             self.onError.emit()
             return
 
@@ -59,7 +59,10 @@ class SmaliThread(QThread):
         if _path:
             self._adb.pull(_path, '.tmp/base.apk')
             if os.path.exists('.tmp/base.apk'):
-                utils.do_shell_command('d2j-baksmali.bat .tmp/base.apk -o .tmp/smali')
+                _baksmali_cmd = 'd2j-baksmali.sh'
+                if os.name == 'nt':
+                    _baksmali_cmd = _baksmali_cmd.replace('.sh', '.bat')
+                utils.do_shell_command(_baksmali_cmd + ' .tmp/base.apk -o .tmp/smali')
                 self.onFinished.emit()
 
         self.onError.emit()
@@ -75,9 +78,9 @@ class AndroidSession(Session):
         self._app_window = app_window
 
         self.adb = Adb()
-        if not self.adb.is_available():
-            print('No ADB available')
-            return
+
+        if not self.adb.is_adb_available():
+            utils.show_message_box(self.adb.get_states_string())
 
         self._device_window = DeviceWindow(self._app_window, 'usb')
 
@@ -85,15 +88,6 @@ class AndroidSession(Session):
         self._menu = [QMenu(self.session_type + ' Session')]
         #self._menu[0].addAction('Save Session', self._save_session)
         self._menu[0].addAction('Close Session', self.stop_session)
-
-        # connect to onUiReady so we know when sessionui is created
-        self.onUiReady.connect(self._ui_ready)
-
-    def _ui_ready(self):
-        # session ui is available via self.session_ui now
-        # if u requested memory to create in sessionui then
-        # it is available via self.session_ui.memory and so on
-        print('ui ready')
 
     @property
     def session_ui_sections(self):
@@ -114,10 +108,6 @@ class AndroidSession(Session):
 
     def initialize(self, config):
         # session supports load/save then use config
-
-        if not self.adb.available:
-            self.onStopped.emit()
-            return
 
         # setup ui etc for android
         self._setup_menu()
@@ -152,10 +142,6 @@ class AndroidSession(Session):
         java_menu.addAction('Classes', self._on_java_classes)
         self._menu.append(java_menu)
 
-        # additional menus
-        #device_menu = QMenu('&Device')
-        # self._menu.append(device_menu)
-
     def stop_session(self):
         # cleanup ur stuff
 
@@ -168,6 +154,7 @@ class AndroidSession(Session):
             self._device_window.setModal(True)
             self._device_window.onSelectedProcess.connect(self.on_proc_selected)
             self._device_window.onSpwanSelected.connect(self.on_spawn_selected)
+            self._device_window.onClosed.connect(self._on_devdlg_closed)
             self._device_window.show()
         else:
             if not args.spawn:
@@ -274,3 +261,7 @@ class AndroidSession(Session):
 
         self._app_window.show_main_tab('java-inspector')
         self.dwarf.dwarf_api('enumerateJavaClasses')
+
+    def _on_devdlg_closed(self):
+        if self.dwarf.device is None:
+            self.stop_session()

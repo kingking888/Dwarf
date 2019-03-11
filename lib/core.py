@@ -27,11 +27,11 @@ from ui.hex_edit import HighLight, HighlightExistsError
 from lib import utils
 from lib.context import Context
 from lib.emulator import Emulator
-from lib.git import Git
+
 from lib.hook import Hook
 from lib.kernel import Kernel
 from lib.prefs import Prefs
-from lib.scripts_manager import ScriptsManager
+
 from ui.dialog_input import InputDialog
 from ui.panel_trace import TraceEvent
 
@@ -69,6 +69,8 @@ class Dwarf(QObject):
     onMemoryScanMatch = pyqtSignal(list, name='onMemoryScanMatch')
 
     onJavaTraceEvent = pyqtSignal(list, name='onJavaTraceEvent')
+
+    onAttached = pyqtSignal(list, name='onAttached')
 
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
@@ -109,9 +111,6 @@ class Dwarf(QObject):
 
         # core utils
         self.emulator = Emulator(self)
-        self.git = Git()
-        self.prefs = Prefs()
-        self.script_manager = ScriptsManager(self)
 
         self._spawned = False
 
@@ -180,7 +179,7 @@ class Dwarf(QObject):
             self.detach()
 
         try:
-            self.process = self.device.attach(pid_or_package)
+            self.process = self.device.attach(pid_or_package[0])
             self.process.enable_jit()
             self.pid = self.process._impl.pid
             self._spawned = False
@@ -188,7 +187,7 @@ class Dwarf(QObject):
             if print_debug_error:
                 utils.show_message_box('Failed to attach to %s' % str(pid_or_package), str(e))
             return 2
-
+        self.onAttached.emit([self.pid, pid_or_package[1]])
         self.load_script(script)
         return 0
 
@@ -245,6 +244,7 @@ class Dwarf(QObject):
         except Exception as e:
             utils.show_message_box('Failed to spawn to %s' % package, str(e))
             return 2
+        self.onAttached.emit([self.pid, package])
         self.load_script(script)
         return 0
 
@@ -550,9 +550,6 @@ class Dwarf(QObject):
     def get_emulator(self):
         return self.emulator
 
-    def get_git(self):
-        return self.git
-
     def get_kernel(self):
         return self.kernel
 
@@ -561,9 +558,3 @@ class Dwarf(QObject):
 
     def get_native_traced_tid(self):
         return self.native_traced_tid
-
-    def get_prefs(self):
-        return self.prefs
-
-    def get_scripts_manager(self):
-        return self.script_manager

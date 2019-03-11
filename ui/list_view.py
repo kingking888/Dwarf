@@ -81,7 +81,6 @@ class DwarfListView(QTreeView):
     def clear(self):
         """ Delete Entries but not Headerdata
         """
-        # delete entries but not headerdata
         model = self.model()
         if model is not None:
             model.removeRows(0, model.rowCount())
@@ -100,8 +99,8 @@ class DwarfListView(QTreeView):
                         item_data.append('')
 
                 return item_data
-            else:
-                return None
+
+        return None
 
     def get_item_text(self, index, col):
         """ returns text in index, col
@@ -119,61 +118,71 @@ class DwarfListView(QTreeView):
         """ looks in all fields for text
             returns true if text exists
         """
+        ret_val = False
         if self.model() is not None:
             for i in range(self.model().rowCount()):
                 for j in range(self.model().columnCount()):
                     item_text = self.get_item_text(i, j)
                     if case_sensitive and (item_text == text):
-                        return True
+                        ret_val = True
+                        break
                     elif not case_sensitive and (item_text.lower() == text.lower()):
-                        return True
+                        ret_val = True
+                        break
 
-        return False
+        return ret_val
 
     def number_of_items(self):
         """ returns number of rows
         """
         if self.model() is not None:
             return self.model().rowCount()
-        else:
-            return None
+
+        return None
 
     def number_of_rows(self):
         """ returns number of rows
         """
         if self.model() is not None:
             return self.number_of_items()
-        else:
-            return None
+
+        return None
 
     def number_of_total(self):
         """ returns number of all fields rows+cols
         """
         if self.model() is not None:
             return self.model().rowCount() + self.model().columnCount()
-        else:
-            return None
+
+        return None
 
     def number_of_cols(self):
         """ returns number of cols
         """
         if self.model() is not None:
             return self.model().columnCount()
-        else:
-            return None
 
-    # override doubleclickevent to prevent doublerightclicks
-    def mouseDoubleClickEvent(self, event):
+        return None
+
+    # ************************************************************************
+    # **************************** Handlers **********************************
+    # ************************************************************************
+    def mouseDoubleClickEvent(self, event):  # pylint: disable=invalid-name
+        """ override doubleclickevent to prevent doublerightclicks
+        """
         if event.button() == Qt.LeftButton:
             super().mouseDoubleClickEvent(event)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event):  # pylint: disable=invalid-name
+        """ override to give user control over header back
+        """
         super(DwarfListView, self).resizeEvent(event)
         header = self.header()
+        resize_mode = (QHeaderView.ResizeToContents | QHeaderView.Interactive)
         if header:
-            for column in range(header.count()):
-                if header.sectionResizeMode(column) == (QHeaderView.ResizeToContents | QHeaderView.Interactive):
-                    header.setSectionResizeMode(column, QHeaderView.ResizeToContents)
-                    width = header.sectionSize(column)
-                    header.setSectionResizeMode(column, QHeaderView.Interactive)
-                    header.resizeSection(column, width)
+            for col in range(header.count()):
+                if header.sectionResizeMode(col) == resize_mode:
+                    header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+                    width = header.sectionSize(col)
+                    header.setSectionResizeMode(col, QHeaderView.Interactive)
+                    header.resizeSection(col, width)

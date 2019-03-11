@@ -27,14 +27,15 @@ class Session(QObject):
     onStopped = pyqtSignal(name='onStopped')
     onClosed = pyqtSignal(name='onClosed')
 
-    onUiReady = pyqtSignal(name='onUiReady')
-
     def __init__(self, parent=None, session_type=''):
         super(Session, self).__init__(parent)
         self._dwarf = Dwarf(self, parent)
         self._dwarf.onScriptDestroyed.connect(self.stop)
         self._session_type = session_type
 
+    # ************************************************************************
+    # **************************** Properties ********************************
+    # ************************************************************************
     @property
     def dwarf(self):
         return self._dwarf
@@ -62,6 +63,9 @@ class Session(QObject):
     def load_config(self, config_filename):
         pass
 
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
     def stop(self):
         self.dwarf.detach()
         self.onStopped.emit()

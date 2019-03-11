@@ -34,11 +34,6 @@ class LocalSession(Session):
         self._menu = [QMenu(self.session_type + ' Session')]
         self._menu[0].addAction('Close Session', self.stop)
 
-        self.onUiReady.connect(self._ui_ready)
-
-    def _ui_ready(self):
-        print('ui ready')
-
     @property
     def session_ui_sections(self):
         # what sections we want in session_ui
@@ -91,6 +86,7 @@ class LocalSession(Session):
         if args.package is None:
             self._device_window.setModal(True)
             self._device_window.onSelectedProcess.connect(self.on_proc_selected)
+            self._device_window.onClosed.connect(self._on_devdlg_closed)
             self._device_window.show()
         else:
             if not args.spawn:
@@ -107,7 +103,10 @@ class LocalSession(Session):
                     print('-failed-')
                     exit(ret_val)
 
-    def on_proc_selected(self, pid):
+    def on_proc_selected(self, data):
+        device, pid = data
+        if device:
+            self.dwarf.device = device
         if pid:
             self.dwarf.attach(pid)
 
@@ -127,3 +126,6 @@ class LocalSession(Session):
 
     def _on_detach(self):
         self.dwarf.detach()
+
+    def _on_devdlg_closed(self):
+        self.stop()

@@ -141,6 +141,7 @@ class UpdateBar(QWidget):
 class WelcomeDialog(QDialog):
 
     onSessionSelected = pyqtSignal(str, name='onSessionSelected')
+    onUpdateComplete = pyqtSignal(name='onUpdateComplete')
 
     def __init__(self, parent=None):
         super(WelcomeDialog, self).__init__(parent=parent)
@@ -160,7 +161,7 @@ class WelcomeDialog(QDialog):
         self.setup_ui()
 
         self.update_commits_thread = DwarfCommitsThread(parent)
-        self.update_commits_thread.on_update_available.connect(self.on_dwarf_isupdate)
+        self.update_commits_thread.on_update_available.connect(self._on_dwarf_isupdate)
         self.update_commits_thread.start()
         # center
         self.setGeometry(QStyle.alignedRect(Qt.LeftToRight, Qt.AlignCenter, self.size(), qApp.desktop().availableGeometry()))
@@ -248,12 +249,17 @@ class WelcomeDialog(QDialog):
         main_wrap.addLayout(h_box)
         self.setLayout(main_wrap)
 
-    def on_dwarf_isupdate(self):
-        pass
+    def _on_dwarf_isupdate(self):
         self.update_bar.setVisible(True)
 
     def _update_dwarf(self):
-        print('update clicked')
+        self._update_thread = DwarfUpdateThread(self)
+        self._update_thread.on_finished.connect(self._update_finished)
+        if not self._update_thread.isRunning():
+            self._update_thread.start()
+
+    def _update_finished(self):
+        self.onUpdateComplete.emit()
 
     def _on_android_button(self):
         self.onSessionSelected.emit('Android')

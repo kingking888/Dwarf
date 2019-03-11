@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import QHeaderView, QMenu
 
 from ui.list_view import DwarfListView
 
-import pyperclip
+from lib import utils
 
 
 class RangesPanel(DwarfListView):
@@ -184,31 +184,12 @@ class RangesPanel(DwarfListView):
                     self._ranges_model.item(index, 0).text()))
 
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self._ranges_model.item(index, 0).text()))
             context_menu.addSeparator()
 
         context_menu.addAction('Refresh', self.update_ranges)
         context_menu.exec_(glbl_pt)
-
-    def _copy_address(self, data):
-        """ MenuItem Copy Address
-        """
-        if isinstance(data, str):
-            if data.startswith('0x'):
-                pyperclip.copy(data)
-        elif isinstance(data, int):
-            str_fmt = '0x{0:X}'
-            if not self.uppercase_hex:
-                str_fmt = '0x{0:x}'
-
-            pyperclip.copy(str_fmt.format(data))
-
-    def _copy_str(self, data):
-        """ CopyHelper
-        """
-        if isinstance(data, str):
-            pyperclip.copy(data)
 
     def _range_dblclicked(self, model_index):
         """ RangeItem DoubleClicked

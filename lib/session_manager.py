@@ -34,16 +34,17 @@ class SessionManager(QObject):
         self._app_window = parent
         self._session = None
 
+    # ************************************************************************
+    # **************************** Properties ********************************
+    # ************************************************************************
     @property
     def session(self):
         if self._session is not None:
             return self._session
 
-    def session_ready(self):
-        if self._session is not None:
-            # self._session.main_menu
-            self.sessionCreated.emit()
-
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
     def create_session(self, session_type):
         session_type = session_type.join(session_type.split()).lower()
         if self._session is not None:
@@ -57,9 +58,9 @@ class SessionManager(QObject):
                 self._session = None
 
             if self._session is not None:
-                self._session.onCreated.connect(self.session_ready)
+                self._session.onCreated.connect(self._session_ready)
                 self._session.onClosed.connect(self._clear_session)
-                self._session.onStopped.connect(self.session_finished)
+                self._session.onStopped.connect(self._session_finished)
                 self._session.initialize(config='')
 
     def start_session(self, args=None):
@@ -71,11 +72,15 @@ class SessionManager(QObject):
         if self._session is not None:
             self._session.stop()
 
+    def _session_ready(self):
+        if self._session is not None:
+            self.sessionCreated.emit()
+
     def _clear_session(self):
         if self._session is not None:
             self._session = None
             self.sessionClosed.emit()
 
-    def session_finished(self):
+    def _session_finished(self):
         if self._session is not None:
             self.sessionStopped.emit()

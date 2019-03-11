@@ -17,11 +17,11 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 
 import json
 
-import pyperclip
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QStandardItemModel, QStandardItem
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QTreeView, QHeaderView, QMenu
-
+from PyQt5.QtWidgets import (QWidget, QHBoxLayout, QVBoxLayout, QHeaderView,
+                             QMenu)
+from lib import utils
 from ui.list_view import DwarfListView
 
 
@@ -34,13 +34,14 @@ class ModulesPanel(QWidget):
             onModuleSelected([ptr, size#int]) - ModuleDoubleClicked
             onModuleFuncSelected(ptr) - FunctionDoubleClicked
     """
+    # pylint: disable=too-many-instance-attributes
 
     onAddHook = pyqtSignal(list, name='onAddHook')
     onDumpBinary = pyqtSignal(list, name='onDumpBinary')
     onModuleSelected = pyqtSignal(list, name='onModuleSelected')
     onModuleFuncSelected = pyqtSignal(str, name='onModuleFuncSelected')
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None):  # pylint: disable=too-many-statements
         super(ModulesPanel, self).__init__(parent)
         self._app_window = parent
 
@@ -110,7 +111,8 @@ class ModulesPanel(QWidget):
         self.modules_list.header().setSectionResizeMode(
             2, QHeaderView.ResizeToContents)
         h_box.addWidget(self.modules_list)
-        self.modules_list.selectionModel().selectionChanged.connect(self._module_clicked)
+        self.modules_list.selectionModel().selectionChanged.connect(
+            self._module_clicked)
 
         hv_box = QVBoxLayout()
         self.imports_list = DwarfListView()
@@ -369,14 +371,14 @@ class ModulesPanel(QWidget):
                     self.modules_model.item(index, 1).text(),
                     self.modules_model.item(index, 2).text()))
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self.modules_model.item(index, 1).text()))
             context_menu.addSeparator()
             context_menu.addAction(
-                'Copy Name', lambda: self._copy_str(
+                'Copy Name', lambda: utils.copy_str_to_clipboard(
                     self.modules_model.item(index, 0).text()))
             context_menu.addAction(
-                'Copy Path', lambda: self._copy_str(
+                'Copy Path', lambda: utils.copy_str_to_clipboard(
                     self.modules_model.item(index, 3).text()))
             context_menu.addSeparator()
 
@@ -396,13 +398,14 @@ class ModulesPanel(QWidget):
                 'Add Hook', lambda: self._add_hook(addr, func_name))
             context_menu.addSeparator()
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self.imports_model.item(index, 1).text()))
             context_menu.addSeparator()
             context_menu.addAction(
-                'Copy FunctionName', lambda: self._copy_str(func_name))
+                'Copy FunctionName', lambda: utils.copy_str_to_clipboard(
+                    func_name))
             context_menu.addAction(
-                'Copy ModuleName', lambda: self._copy_str(
+                'Copy ModuleName', lambda: utils.copy_str_to_clipboard(
                     self.imports_model.item(index, 2).text()))
             context_menu.exec_(glbl_pt)
 
@@ -419,11 +422,12 @@ class ModulesPanel(QWidget):
                 'Add Hook', lambda: self._add_hook(addr, func_name))
             context_menu.addSeparator()
             context_menu.addAction(
-                'Copy Address', lambda: self._copy_address(
+                'Copy Address', lambda: utils.copy_hex_to_clipboard(
                     self.exports_model.item(index, 1).text()))
             context_menu.addSeparator()
             context_menu.addAction(
-                'Copy FunctionName', lambda: self._copy_str(func_name))
+                'Copy FunctionName', lambda: utils.copy_str_to_clipboard(
+                    func_name))
             context_menu.exec_(glbl_pt)
 
     def _on_dumpmodule(self, ptr, size):
@@ -437,25 +441,6 @@ class ModulesPanel(QWidget):
 
         size = size.replace(',', '')
         self.onDumpBinary.emit([ptr, size])
-
-    def _copy_address(self, data):
-        """ MenuItem Copy Address
-        """
-        if isinstance(data, str):
-            if data.startswith('0x'):
-                pyperclip.copy(data)
-        elif isinstance(data, int):
-            str_fmt = '0x{0:X}'
-            if not self.uppercase_hex:
-                str_fmt = '0x{0:x}'
-
-            pyperclip.copy(str_fmt.format(data))
-
-    def _copy_str(self, data):
-        """ CopyHelper
-        """
-        if isinstance(data, str):
-            pyperclip.copy(data)
 
     def _add_hook(self, ptr, name=None):
         """ MenuItem AddHook

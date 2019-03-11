@@ -37,6 +37,8 @@ from ui.panel_trace import TraceEvent
 
 
 class AppWindow(QMainWindow):
+    onRestart = pyqtSignal(name='onRestart')
+
     def __init__(self, dwarf_args, flags=None):
         super(AppWindow, self).__init__(flags)
 
@@ -76,6 +78,8 @@ class AppWindow(QMainWindow):
 
         # load external assets
         _app = QApplication.instance()
+
+        self.remove_tmp_dir()
 
         # themes
         self.prefs = Prefs()
@@ -129,13 +133,6 @@ class AppWindow(QMainWindow):
             if os.path.exists(utils.resource_path('assets/OpenSans-Bold.ttf')):
                 QFontDatabase.addApplicationFont('assets/OpenSans-Bold.ttf')
 
-        if os.path.exists('.tmp'):
-            for root, dirs, files in os.walk('.tmp', topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-            os.rmdir(root)
         # mainwindow statusbar
         self.progressbar = QProgressBar()
         self.progressbar.setRange(0, 0)
@@ -158,6 +155,7 @@ class AppWindow(QMainWindow):
         if self.dwarf_args.package is None:
             self.welcome_window = WelcomeDialog(self)
             self.welcome_window.setModal(True)
+            self.welcome_window.onUpdateComplete.connect(self._on_dwarf_updated)
             self.welcome_window.setWindowTitle(
                 'Welcome to DWARF - A debugger for reverse engineers, crackers and security analyst'
             )
@@ -182,7 +180,7 @@ class AppWindow(QMainWindow):
     def _setup_main_menu(self):
         self.menu = self.menuBar()
         dwarf_menu = QMenu('DWARF', self)
-        dwarf_menu.addAction('Exit')
+        dwarf_menu.addAction('Exit', self.session_closed)
         self.menu.addMenu(dwarf_menu)
 
         session = self.session_manager.session
@@ -211,6 +209,18 @@ class AppWindow(QMainWindow):
         about_menu.addSeparator()
         about_menu.addAction('Info')
         self.menu.addMenu(about_menu)
+
+    def _on_dwarf_updated(self):
+        self.onRestart.emit()
+
+    def remove_tmp_dir(self):
+        if os.path.exists('.tmp'):
+            for root, dirs, files in os.walk('.tmp', topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+            os.rmdir(root)
 
     def _set_theme(self, qaction):
         if qaction:
@@ -487,6 +497,7 @@ class AppWindow(QMainWindow):
             ui_elem = ui_elem.join(ui_elem.split()).lower()
             self._create_ui_elem(ui_elem)
 
+        self.dwarf.onAttached.connect(self._on_attached)
         # hookup
         self.dwarf.onSetRanges.connect(self._on_setranges)
         self.dwarf.onSetModules.connect(self._on_setmodules)
@@ -510,6 +521,7 @@ class AppWindow(QMainWindow):
         self.showMaximized()
 
     def session_stopped(self):
+        self.remove_tmp_dir()
         self.menu.clear()
 
         self.main_tabs.clear()
@@ -558,14 +570,12 @@ class AppWindow(QMainWindow):
     def session_closed(self):
         self.hide()
         if self.welcome_window is not None:
-            self.welcome_window.show()
+            self.welcome_window.exec()
 
         # close if it was a commandline session
         if self.welcome_window is None:
             if self.dwarf_args.package:
                 self.close()
-        # self.app.session_ui.hide()
-        # self.app.welcome_ui.show()
 
     # ui handler
     def closeEvent(self, event):
@@ -578,10 +588,8 @@ class AppWindow(QMainWindow):
         q_settings = QSettings("dwarf_window_pos.ini", QSettings.IniFormat)
         q_settings.setValue('dwarf_ui_state', self.saveGeometry())
         q_settings.setValue('dwarf_ui_window', self.saveState())
-        if self.session_manager.session is not None:
-            self.session_manager.stop_session()
 
-        # self.dwarf.detach()
+        self.dwarf.detach()
         super(AppWindow, self).closeEvent(event)
 
     def _on_watcher_clicked(self, ptr):
@@ -767,3 +775,6 @@ class AppWindow(QMainWindow):
     def hide_progress(self):
         self.progressbar.setVisible(False)
         self.set_status_text('')
+
+    def _on_attached(self, data):
+        self.setWindowTitle('Dwarf - Attached to %s (%s)' % (data[1], data[0]))

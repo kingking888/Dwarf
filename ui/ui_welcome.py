@@ -197,11 +197,11 @@ class FridaUpdateThread(QThread):
                     # kill frida
                     self.adb.kill_frida()
                     # copy file note: mv give sometimes a invalid id error
-                    self.adb.su('cp /sdcard/frida /system/xbin/frida')
+                    self.adb.su_cmd('cp /sdcard/frida /system/xbin/frida')
                     # remove file
-                    self.adb.su('rm /sdcard/frida')
+                    self.adb.su_cmd('rm /sdcard/frida')
                     # make it executable
-                    self.adb.su('chmod 755 /system/xbin/frida')
+                    self.adb.su_cmd('chmod 755 /system/xbin/frida')
                     # start it
                     if not self.adb.start_frida():
                         self.on_status_text('failed to start frida')

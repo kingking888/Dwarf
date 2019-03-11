@@ -16,6 +16,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 """
 
 from PyQt5.QtCore import QObject, pyqtSignal
+from lib.git import Git
 
 
 class ScriptsManager(QObject):
@@ -27,15 +28,15 @@ class ScriptsManager(QObject):
 
     scriptsUpdated = pyqtSignal(name='scriptsUpdated')
 
-    def __init__(self, dwarf):
+    def __init__(self):
         super(ScriptsManager, self).__init__()
-        self.dwarf = dwarf
+        self._git = Git()
         self.scripts = {}
 
         self.update_scripts()
 
     def update_scripts(self):
-        scripts = self.dwarf.get_git().get_dwarf_scripts()
+        scripts = self._git.get_dwarf_scripts()
 
         if scripts is None:
             return
@@ -58,7 +59,7 @@ class ScriptsManager(QObject):
 
                 info_url = url + '/master/dwarf.json'
                 script_url = url + '/master/script.js'
-                info = self.dwarf.get_git().get_script_info(info_url)
+                info = self._git.get_script_info(info_url)
                 if info is None:
                     continue
                 self.scripts[module_name] = {

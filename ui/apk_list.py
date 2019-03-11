@@ -63,7 +63,7 @@ class ApkListDialog(QDialog):
     # **************************** Handlers **********************************
     # ************************************************************************
     def _on_install(self):
-        if self.file_path.text() is '':
+        if not self.file_path.text():
             file_path = QFileDialog.getOpenFileName(
                 self, 'Select an apk to install', QDir.currentPath(), '*.apk')
             self.file_path.setText(file_path)
@@ -94,13 +94,13 @@ class PackageRetrieveThread(QThread):
         super(PackageRetrieveThread, self).__init__(parent=parent)
         self.adb = adb
 
-        if not self.adb.is_available():
+        if not self.adb.available():
             return
 
     def run(self):
         """run
         """
-        if self.adb.is_available():
+        if self.adb.available():
             packages = self.adb.list_packages()
             for package in sorted(packages, key=lambda x: x.package):
                 self.onAddPackage.emit([package.package, package.path])
@@ -119,7 +119,7 @@ class ApkList(DwarfListView):
 
         self.adb = Adb()
 
-        if not self.adb.is_available():
+        if not self.adb.available():
             return
 
         self.retrieve_thread = PackageRetrieveThread(self.adb)

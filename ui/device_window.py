@@ -33,6 +33,8 @@ from ui.widget_item_not_editable import NotEditableListWidgetItem
 from ui.process_list import ProcessList
 from ui.spawns_list import SpawnsList
 
+from lib import utils
+
 
 class FridaUpdateThread(QThread):
     """ FridaServer Update Thread
@@ -91,11 +93,11 @@ class FridaUpdateThread(QThread):
                     # kill frida
                     self.adb.kill_frida()
                     # copy file note: mv give sometimes a invalid id error
-                    self.adb.su('cp /sdcard/frida /system/xbin/frida')
+                    self.adb.su_cmd('cp /sdcard/frida /system/xbin/frida')
                     # remove file
-                    self.adb.su('rm /sdcard/frida')
+                    self.adb.su_cmd('rm /sdcard/frida')
                     # make it executable
-                    self.adb.su('chmod 755 /system/xbin/frida')
+                    self.adb.su_cmd('chmod 755 /system/xbin/frida')
                     # start it
                     if not self.adb.start_frida():
                         self.on_status_text('Failed to start frida')
@@ -219,7 +221,8 @@ class DeviceBar(QWidget):
             self.is_waiting = False
             self.update_label.setStyleSheet('background-color: yellowgreen;')
             self.update_label.setText('Device found: ' + device_name)
-            if self._adb.is_available():
+            self._adb._check_requirements()
+            if self._adb.available():
                 device_frida = self._adb.get_frida_version()
                 if device_frida is None:
                     self._install_btn.setVisible(True)
@@ -261,7 +264,8 @@ class DeviceBar(QWidget):
 
     def _on_device(self):
         self._timer_step = 4
-        # self.onDeviceUpdated.emit()
+        self.is_waiting = True
+        self._on_timer()
 
     def _on_install_btn(self):
         # urls are empty
@@ -283,7 +287,7 @@ class DeviceBar(QWidget):
                     request_url = self.updated_frida_assets_url[arch]
 
             try:
-                if self._adb.is_available() and request_url.index('https://') == 0:
+                if self._adb.available() and request_url.index('https://') == 0:
                     self._install_btn.setVisible(False)
 
                     if self._update_thread is not None:
@@ -308,7 +312,7 @@ class DeviceBar(QWidget):
         self._on_timer()
 
     def _on_start_btn(self):
-        if self._adb.is_available():
+        if self._adb.available():
             self._start_btn.setVisible(False)
             if self._adb.start_frida():
                 self.onDeviceUpdated.emit()
@@ -316,7 +320,7 @@ class DeviceBar(QWidget):
                 self._start_btn.setVisible(True)
 
     def _on_restart_btn(self):
-        if self._adb.is_available():
+        if self._adb.available():
             self._restart_btn.setVisible(False)
             if self._adb.start_frida(restart=True):
                 self._restart_btn.setVisible(True)
@@ -327,9 +331,14 @@ class DeviceWindow(QDialog):
 
     onSelectedProcess = pyqtSignal(list, name='onSelectedProcess')
     onSpwanSelected = pyqtSignal(list, name='onSpawnSelected')
+    onClosed = pyqtSignal(name='onClosed')
 
     def __init__(self, parent=None, device='local'):
         super(DeviceWindow, self).__init__(parent=parent)
+        self.setSizeGripEnabled(False)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.setWindowFlag(Qt.WindowCloseButtonHint, True)
         self.setModal(True)
 
         self.device_type = device
@@ -355,6 +364,10 @@ class DeviceWindow(QDialog):
         self.devices_thread = None
 
         self.setup_ui()
+
+    def closeEvent(self, event):
+        super(DeviceWindow, self).closeEvent(event)
+        self.onClosed.emit()
 
     def _update_device(self):
         try:
@@ -401,43 +414,12 @@ class DeviceWindow(QDialog):
         vbox.addLayout(inner_hbox)
         self.setLayout(vbox)
 
-    # onshow start thread
-    def showEvent(self, QShowEvent):
-        super().showEvent(QShowEvent)
-
     def _pid_selected(self, pid):
         if pid:
-            self.onSelectedProcess.emit([self.device, pid[0]])
+            self.onSelectedProcess.emit([self.device, pid])
             self.accept()
 
     def _spawn_selected(self, spawn):
         if spawn[1]:
             self.onSpwanSelected.emit([self.device, spawn[1]])
             self.accept()
-
-    def on_proc_picked(self, widget_android_package):
-        editor = JsEditorDialog(self.app, def_text=self.startup_script,
-                                placeholder_text='// Javascript with frida and dwarf api to run at injection')
-        accept, what = editor.show()
-        if accept:
-            self.startup_script = what
-            app_name = widget_android_package.appname
-            app_pid = widget_android_package.get_pid()
-            if "\t" in app_name:
-                app_name = app_name.split("\t")[1]
-
-            self.app.get_dwarf().attach(app_pid, script=what)
-            self.app.get_dwarf().app_window.update_title("Dwarf - Attached to %s (pid %s)" % (app_name, app_pid))
-
-    def on_spawn_picked(self, widget_android_package):
-        editor = JsEditorDialog(self.app, def_text=self.startup_script,
-                                placeholder_text='// Javascript with frida and dwarf api to run at injection')
-        accept, what = editor.show()
-        if accept:
-            self.startup_script = what
-
-            app_name = widget_android_package.appname
-            package_name = widget_android_package.get_package_name()
-
-            self.app.get_dwarf().spawn(package_name, script=what)
-            self.app.get_dwarf().app_window.update_title("Dwarf - Attached to %s (%s)" % (app_name, package_name))
