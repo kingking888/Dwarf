@@ -139,7 +139,7 @@ class EmulatorPanel(QWidget):
         super().__init__(*__args)
 
         self.app = app
-        self.emulator = self.app.dwarf.get_emulator()
+        self.emulator = self.app.dwarf.emulator
         self.until_address = 0
 
         layout = QVBoxLayout()

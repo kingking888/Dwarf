@@ -619,6 +619,8 @@ class HexEditor(QAbstractScrollArea):
     def pixel_to_caret(self, pos_x, pos_y):
         """ screen to caretpos
         """
+        if self.data is None:
+            return None
         # pos in offset
         if pos_x <= (self._hex_start - self._char_width):
             return None

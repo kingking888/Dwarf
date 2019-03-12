@@ -20,7 +20,7 @@ import unicorn
 
 class Context(object):
     def __init__(self, context):
-        if 'toJSON' in context:
+        if 'pc' in context:
             for register in context:
                 if len(register) > 0 and register != 'toJSON':
                     self.__dict__[register] = Register(context[register])

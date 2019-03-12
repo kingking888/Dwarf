@@ -30,6 +30,7 @@ from lib.instruction import Instruction
 from lib.range import Range
 from threading import Thread
 
+from lib.prefs import Prefs
 
 VFP = "4ff4700001ee500fbff36f8f4ff08043e8ee103a"
 
@@ -48,6 +49,7 @@ class Emulator(QObject):
     def __init__(self, dwarf):
         super(Emulator, self).__init__()
         self.dwarf = dwarf
+        self._prefs = Prefs()
 
         self.cs = None
         self.uc = None
@@ -140,11 +142,11 @@ class Emulator(QObject):
         """
         cmd = parts[0]
         if cmd == 'clean':
-            self.dwarf.log(self.clean())
+            return self.clean()
         elif cmd == 'setup':
-            self.dwarf.log(self.setup(parts[1]))
+            return self.setup(parts[1])
         elif cmd == 'start':
-            self.dwarf.log(self.start(parts[1]))
+            return self.start(parts[1])
 
     def clean(self):
         if self._running:
@@ -210,8 +212,8 @@ class Emulator(QObject):
         return True
 
     def invalida_configurations(self):
-        self.callbacks_path = self.dwarf.get_prefs().get(prefs.EMULATOR_CALLBACKS_PATH, '')
-        self.instructions_delay = self.dwarf.get_prefs().get(prefs.EMULATOR_INSTRUCTIONS_DELAY, 0.5)
+        self.callbacks_path = self._prefs.get(prefs.EMULATOR_CALLBACKS_PATH, '')
+        self.instructions_delay = self._prefs.get(prefs.EMULATOR_INSTRUCTIONS_DELAY, 0.5)
 
     def map_range(self, address):
         range_ = Range(Range.SOURCE_TARGET, self.dwarf)
@@ -254,6 +256,12 @@ class Emulator(QObject):
     def start(self, until=0):
         if self._running:
             return 10
+
+        if isinstance(until, str):
+            try:
+                until = int(until, 16)
+            except ValueError:
+                until = 0
 
         if until > 0:
             self.end_ptr = utils.parse_ptr(until)
@@ -301,7 +309,7 @@ class Emulator(QObject):
             except Exception as e:
                 self.log_to_ui('[*] failed to load callbacks: %s' % str(e))
                 # reset callbacks path
-                self.dwarf.get_prefs().put(prefs.EMULATOR_CALLBACKS_PATH, '')
+                self._prefs.put(prefs.EMULATOR_CALLBACKS_PATH, '')
                 self.callbacks_path = ''
                 self.callbacks = None
         else:

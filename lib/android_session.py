@@ -14,6 +14,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 import os
 import json
 
+import frida
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWidgets import QMenu, QAction, QFileDialog
 
@@ -157,9 +158,10 @@ class AndroidSession(Session):
             self._device_window.onClosed.connect(self._on_devdlg_closed)
             self._device_window.show()
         else:
+            self.dwarf.device = frida.get_usb_device()
             if not args.spawn:
                 print('* Trying to attach to {0}'.format(args.package))
-                ret_val = self.dwarf.attach(args.package, args.script)
+                ret_val = self.dwarf.attach(args.package, args.script, False)
                 if ret_val == 2:
                     print('Failed to attach: use -sp to force spawn')
                     self.stop()

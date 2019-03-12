@@ -103,7 +103,7 @@ class AppWindow(QMainWindow):
                     ctypes.windll.kernel32.SetFileAttributesW(
                         r'desktop.ini',
                         FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)
-                except:
+                except PermissionError:
                     # its hidden+system already
                     pass
 
@@ -401,8 +401,8 @@ class AppWindow(QMainWindow):
             try:
                 _app = QApplication.instance()
                 with open(theme_style) as stylesheet:
-                    _app.setStyleSheet(_app.styleSheet() + '\n' +
-                                       stylesheet.read())
+                    _app.setStyleSheet(_app.styleSheet() + '\n'
+                                       + stylesheet.read())
             except Exception as e:
                 pass
                 #err = self.dwarf.spawn(dwarf_args.package, dwarf_args.script)
@@ -589,7 +589,8 @@ class AppWindow(QMainWindow):
         q_settings.setValue('dwarf_ui_state', self.saveGeometry())
         q_settings.setValue('dwarf_ui_window', self.saveState())
 
-        self.dwarf.detach()
+        if self.dwarf:
+            self.dwarf.detach()
         super(AppWindow, self).closeEvent(event)
 
     def _on_watcher_clicked(self, ptr):
@@ -699,9 +700,12 @@ class AppWindow(QMainWindow):
         if 'context' in context:
             is_java = context['is_java']
             if is_java:
+                if self.java_explorer_panel is None:
+                    self._create_ui_elem('javaexplorer')
                 self.context_panel.set_context(context['ptr'], 1,
                                                context['context'])
                 self.java_explorer_panel.set_handle_arg(-1)
+                self.show_main_tab('javaexplorer')
             else:
                 self.context_panel.set_context(context['ptr'], 0,
                                                context['context'])

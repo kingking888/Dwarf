@@ -15,13 +15,16 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
     along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
 import os
+import numbers
 import binascii
 import json
 from threading import Thread
 
+from frida.core import Session, Device, Script
+
 import frida
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QFileDialog
+from PyQt5.QtCore import QObject, pyqtSignal, QThread
+from PyQt5.QtWidgets import QFileDialog, QApplication
 from ui.hex_edit import HighLight, HighlightExistsError
 
 from lib import utils
@@ -35,61 +38,149 @@ from lib.prefs import Prefs
 from ui.dialog_input import InputDialog
 from ui.panel_trace import TraceEvent
 
+"""
+class DwarfScript(Script):
+
+    def __init__(self, impl):
+        super().__init__(impl=impl)
+
+    def _on_message(self, raw_message, data):
+        if isinstance(raw_message, dict):
+            raw_message = json.dumps(raw_message)
+        return super()._on_message(raw_message, data)
+
+class DwarfDevice(Device):
+
+    def __init__(self, device):
+        super().__init__(device=device)
+        self._attached = False
+        self._spawned = False
+        self._pid = 0
+
+    def __repr__(self):
+        return repr(self._impl)
+
+    def _pid_of(self, target):
+        self._pid = super()._pid_of(target)
+        return self._pid
+
+    def spawn_and_attach(self, program, **kwargs):
+        self._spawned = True
+        pid = self.spawn(program)
+        return self.attach(pid)
+
+    @property
+    def pid(self):
+        return self._pid
+
+    @property
+    def spawned(self):
+        return self._spawned
+
+    @property
+    def attached(self):
+        return self._attached
+
+class DwarfSession(Session):
+
+    def __init__(self, impl):
+        super().__init__(impl=impl)
+        self._is_v8_eng = False
+
+    @property
+    def v8_engine(self):
+        return self._is_v8_eng
+
+    @v8_engine.setter
+    def v8_engine(self, value):
+        self._is_v8_eng = value
+        self.enable_jit()
+"""
+
+
+class NoDeviceAssignedError(Exception):
+    """ Raised when no Device
+    """
+
+
+class CoreScriptNotFoundError(Exception):
+    """ Raised when dwarfscript not found
+    """
+
+
+class EmulatorThread(QThread):
+
+    onCmdCompleted = pyqtSignal(str, name='onCmdCompleted')
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent)
+        self.emulator = None
+        self.cmd = ''
+
+    def run(self):
+        if self.emulator and self.cmd:
+            result = self.emulator.api(self.cmd)
+            self.onCmdCompleted.emit(str(result))
+
 
 class Dwarf(QObject):
+    # ************************************************************************
+    # **************************** Signals ***********************************
+    # ************************************************************************
     # script related
     onScriptLoaded = pyqtSignal(name='onScriptLoaded')
     onScriptDestroyed = pyqtSignal(name='onScriptDestroyed')
+    onAttached = pyqtSignal(list, name='onAttached')
     # hook related
     onAddNativeHook = pyqtSignal(Hook, name='onAddNativeHook')
     onAddJavaHook = pyqtSignal(Hook, name='onAddJavaHook')
     onAddOnLoadHook = pyqtSignal(Hook, name='onAddOnLoadHook')
-
     # watcher related
     onWatcherAdded = pyqtSignal(str, int, name='onWatcherAdded')
     onWatcherRemoved = pyqtSignal(str, name='onWatcherRemoved')
-
     # ranges + modules
     onSetRanges = pyqtSignal(list, name='onSetRanges')
     onSetModules = pyqtSignal(list, name='onSetModules')
-
     onHitOnLoad = pyqtSignal(list, name='onHitOnLoad')
     onLogToConsole = pyqtSignal(str, name='onLogToConsole')
     onTraceData = pyqtSignal(str, name='onTraceData')
     onSetData = pyqtSignal(list, name='onSetData')
     onThreadResumed = pyqtSignal(int, name='onThreadResumed')
     onApplyContext = pyqtSignal(dict, name='onApplyContext')
-
+    # java
     onEnumerateJavaClassesStart = pyqtSignal(name='onEnumerateJavaClassesStart')
     onEnumerateJavaClassesMatch = pyqtSignal(str, name='onEnumerateJavaClassesMatch')
     onEnumerateJavaClassesComplete = pyqtSignal(name='onEnumerateJavaClassesComplete')
     onEnumerateJavaMethodsComplete = pyqtSignal(list, name='onEnumerateJavaMethodsComplete')
-
+    # memory
     onMemoryScanComplete = pyqtSignal(list, name='onMemoryScanComplete')
     onMemoryScanMatch = pyqtSignal(list, name='onMemoryScanMatch')
-
+    # trace
     onJavaTraceEvent = pyqtSignal(list, name='onJavaTraceEvent')
+    onEmulator = pyqtSignal(list, name='onEmulator')
 
-    onAttached = pyqtSignal(list, name='onAttached')
-
+    # ************************************************************************
+    # **************************** Init **************************************
+    # ************************************************************************
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
 
         self.app_window = parent
 
         self.java_available = False
-        self.loading_library = False
+        self._loading_library = False
 
         # frida device
-        self.device = device
+        self._device = device
 
         # process
-        self.pid = 0
-        self.process = None
-        self.script = None
+        self._pid = 0
+        self._process = None
+        self._script = None
+        self._spawned = False
 
         # kernel
-        self.kernel = Kernel(self)
+        self._kernel = Kernel(self)
 
         # hooks
         self.hooks = {}
@@ -100,21 +191,24 @@ class Dwarf(QObject):
         self.java_pending_args = None
 
         # context
-        self.arch = ''
-        self.pointer_size = 0
+        self._arch = ''
+        self._pointer_size = 0
         self.contexts = {}
         self.context_tid = 0
-        self.platform = ''
+        self._platform = ''
 
         # tracers
-        self.native_traced_tid = 0
+        self._native_traced_tid = 0
 
         # core utils
-        self.emulator = Emulator(self)
-
-        self._spawned = False
+        self._emulator = Emulator(self)
+        self._emu_thread = EmulatorThread(self)
+        self._emu_thread.onCmdCompleted.connect(self._on_emu_completed)
+        self._emu_thread.emulator = self.emulator
+        self._emu_queue = []
 
         self.onApplyContext.connect(self._on_apply_context)
+        self.onEmulator.connect(self._on_emulator)
 
         self.keystone_installed = False
         try:
@@ -123,35 +217,16 @@ class Dwarf(QObject):
         except:
             pass
 
-    def _get_device(self):
-        try:
-            self.device = frida.get_usb_device()
-        except frida.TimedOutError:
-            self.device = None
-
-        if self.device is None:
-            # now check for a local device
-            try:
-                self.device = frida.get_local_device()
-            except frida.TimedOutError:
-                self.device = None
-
-            if self.device is None:
-                return 1
-        return 0
-
     def _reinitialize(self):
         self.java_available = False
-        self.loading_library = False
+        self._loading_library = False
 
         # frida device
-        self.device = None
+        self._device = None
 
         # process
-        self._spawned = False
-        self.pid = 0
-        self.process = None
-        self.script = None
+        self._process = None
+        self._script = None
 
         # hooks
         self.hooks = {}
@@ -162,50 +237,144 @@ class Dwarf(QObject):
         self.java_pending_args = None
 
         # tracers
-        self.native_traced_tid = 0
+        self._native_traced_tid = 0
 
-    def device_picked(self, device):
-        self.device = device
+    # ************************************************************************
+    # **************************** Properties ********************************
+    # ************************************************************************
+    @property
+    def kernel(self):
+        return self._kernel
 
-    def attach(self, pid_or_package, script=None, print_debug_error=True):
+    @property
+    def emulator(self):
+        return self._emulator
+
+    @property
+    def loading_library(self):
+        return self._loading_library
+
+    @property
+    def native_trace_tid(self):
+        return self._native_traced_tid
+
+    @property
+    def arch(self):
+        return self._arch
+
+    @property
+    def pid(self):
+        return self._pid
+        # return self.device.pid
+
+    @property
+    def platform(self):
+        return self._platform
+
+    @property
+    def pointer_size(self):
+        return self._pointer_size
+
+    @property
+    def process(self):
+        return self._process
+
+    @property
+    def device(self):
+        return self._device
+
+    @device.setter
+    def device(self, value):
+        try:
+            if isinstance(value, frida.core.Device):
+                self._device = value
+            # elif isinstance(value, DwarfDevice):
+            #    self._device = value
+        except ValueError:
+            self._device = None
+
+    @property
+    def emulator(self):
+        return self._emulator
+
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
+    def attach(self, pid, script=None, print_debug_error=True):
+        """ Attach to pid
+        """
         if self.device is None:
-            # fallback to usb device
-            # can come from -p in args
-            err = self._get_device()
-            if err > 0:
-                return err
+            raise NoDeviceAssignedError()
 
-        if self.process is not None:
+        if self._process is not None:
             self.detach()
 
+        was_error = False
+        error_msg = ''
+
+        # for commandline arg
+        if isinstance(pid, str):
+            try:
+                process = self.device.get_process(pid)
+                pid = [process.pid, process.name]
+            except frida.ProcessNotFoundError as error:
+                print(error)
+                return 2
+
+        if not isinstance(pid, list):
+            return 1
+
         try:
-            self.process = self.device.attach(pid_or_package[0])
-            self.process.enable_jit()
-            self.pid = self.process._impl.pid
-            self._spawned = False
-        except Exception as e:
+            self._process = self.device.attach(pid[0])
+            self._process.enable_jit()
+            self._pid = pid[0]
+        except frida.ProcessNotFoundError:
+            error_msg = 'Process not found'
+            was_error = True
+        except frida.ProcessNotRespondingError:
+            error_msg = 'Process not responding'
+            was_error = True
+        except frida.TimedOutError:
+            error_msg = 'Frida timeout'
+            was_error = True
+        except frida.ServerNotRunningError:
+            error_msg = 'Frida not running'
+            was_error = True
+        # keep for debug
+        except Exception as error:  # pylint: disable=broad-except
+            error_msg = error
+            was_error = True
+
+        if was_error:
             if print_debug_error:
-                utils.show_message_box('Failed to attach to %s' % str(pid_or_package), str(e))
+                utils.show_message_box('Failed to attach to ' + pid[1], error_msg)
+
             return 2
-        self.onAttached.emit([self.pid, pid_or_package[1]])
+
+        self.onAttached.emit([self.pid, pid[1]])
         self.load_script(script)
         return 0
 
     def detach(self):
-        if self.script is not None:
+        if self._script is not None:
             self.dwarf_api('_detach')
-            self.script.unload()
-        if self.process is not None:
-            self.process.detach()
+            self._script.unload()
+        if self._process is not None:
+            self._process.detach()
+            if self._spawned:
+                self.device.kill(self.pid)
 
     def load_script(self, script=None):
         try:
-            with open('lib/script.js', 'r') as f:
-                s = f.read()
-            self.script = self.process.create_script(s)
-            self.script.on('message', self.on_message)
-            self.script.on('destroyed', self.on_destroyed)
-            self.script.load()
+            if not os.path.exists('lib/core.js'):
+                raise CoreScriptNotFoundError()
+
+            with open('lib/core.js', 'r') as core_script:
+                sript_content = core_script.read()
+            self._script = self._process.create_script(sript_content)
+            self._script.on('message', self._on_message)
+            self._script.on('destroyed', self._on_destroyed)
+            self._script.load()
 
             if script is not None:
                 user_script = ''
@@ -223,23 +392,17 @@ class Dwarf(QObject):
             print('frida transporterror')
             self.on_destroyed()
 
-        # self.app_window.on_script_loaded()
-
     def spawn(self, package, script=None):
         if self.device is None:
-            # fallback to usb device
-            # can come from -p in args
-            err = self._get_device()
-            if err > 0:
-                return err
+            raise NoDeviceAssignedError()
 
-        if self.process is not None:
+        if self._process is not None:
             self.detach()
 
         try:
-            self.pid = self.device.spawn(package)
-            self.process = self.device.attach(self.pid)
-            self.process.enable_jit()
+            self._pid = self.device.spawn(package)
+            self._process = self.device.attach(self._pid)
+            self._process.enable_jit()
             self._spawned = True
         except Exception as e:
             utils.show_message_box('Failed to spawn to %s' % package, str(e))
@@ -247,160 +410,6 @@ class Dwarf(QObject):
         self.onAttached.emit([self.pid, package])
         self.load_script(script)
         return 0
-
-    def on_message(self, message, data):
-        if 'payload' not in message:
-            print('payload: ' + message)
-            return
-
-        what = message['payload']
-        parts = what.split(':::')
-        if len(parts) < 2:
-            print(what)
-            return
-
-        cmd = parts[0]
-        if cmd == 'backtrace':
-            try:
-                self.app_window.backtrace_panel.set_backtrace(json.loads(parts[1]))
-            except:
-                pass
-        elif cmd == 'emulator':
-            # on a separate thread to allow js api recursion
-            Thread(target=self.emulator.api, args=(parts[1:],)).start()
-        elif cmd == 'enumerate_java_classes_start':
-            self.onEnumerateJavaClassesStart.emit()
-        elif cmd == 'enumerate_java_classes_match':
-            self.onEnumerateJavaClassesMatch.emit(parts[1])
-        elif cmd == 'enumerate_java_classes_complete':
-            self.onEnumerateJavaClassesComplete.emit()
-        elif cmd == 'enumerate_java_methods_complete':
-            self.onEnumerateJavaMethodsComplete.emit([parts[1], json.loads(parts[2])])
-        elif cmd == 'ftrace':
-            if self.app.get_ftrace_panel() is not None:
-                self.app.get_ftrace_panel().append_data(parts[1])
-        elif cmd == 'enable_kernel':
-            self.app_window.get_menu().enable_kernel_menu()
-        elif cmd == 'hook_java_callback':
-            h = Hook(Hook.HOOK_JAVA)
-            h.set_ptr(1)
-            h.set_input(parts[1])
-            if self.java_pending_args:
-                h.set_condition(self.java_pending_args['condition'])
-                h.set_logic(self.java_pending_args['logic'])
-                self.java_pending_args = None
-            self.java_hooks[h.get_input()] = h
-            self.onAddJavaHook.emit(h)
-        elif cmd == 'hook_native_callback':
-            print()
-            h = Hook(Hook.HOOK_NATIVE)
-            h.set_ptr(int(parts[1], 16))
-            h.set_input(self.temporary_input)
-            h.set_bytes(binascii.unhexlify(parts[2]))
-            self.temporary_input = ''
-            h.set_condition(parts[4])
-            h.set_logic(parts[3])
-            self.native_pending_args = None
-            self.hooks[h.get_ptr()] = h
-            self.onAddNativeHook.emit(h)
-        elif cmd == 'hook_onload_callback':
-            h = Hook(Hook.HOOK_ONLOAD)
-            h.set_ptr(0)
-            h.set_input(parts[1])
-            self.on_loads[parts[1]] = h
-            self.onAddOnLoadHook.emit(h)
-        elif cmd == 'java_trace':
-            self.onJavaTraceEvent.emit(parts)
-        elif cmd == 'log':
-            self.log(parts[1])
-        elif cmd == 'memory_scan_match':
-            self.onMemoryScanMatch.emit([parts[1], parts[2], json.loads(parts[3])])
-        elif cmd == 'memory_scan_complete':
-            self.app_window.get_menu().on_bytes_search_complete()
-            self.onMemoryScanComplete.emit([parts[1] + ' complete', 0, 0])
-        elif cmd == 'onload_callback':
-            self.loading_library = parts[1]
-            str_fmt = ('Hook onload {0} @thread := {1}'.format(parts[1], parts[3]))
-            self.log(str_fmt)
-            self.onHitOnLoad.emit([parts[1], parts[2]])
-        elif cmd == 'release':
-            if parts[1] in self.contexts:
-                del self.contexts[parts[1]]
-            self.onThreadResumed.emit(int(parts[1]))
-        elif cmd == 'set_context':
-            data = json.loads(parts[1])
-            if 'modules' in data:
-                self.onSetModules.emit(data['modules'])
-            if 'ranges' in data:
-                self.onSetRanges.emit(data['ranges'])
-
-            self.onApplyContext.emit(data)
-        elif cmd == 'set_data':
-            if data:
-                self.onSetData.emit(['raw', parts[1], data])
-            else:
-                self.onSetData.emit(['plain', parts[1], str(parts[2])])
-        elif cmd == 'script_loaded':
-            if self._spawned:
-                self.device.resume(self.pid)
-        elif cmd == 'tracer':
-            self.onTraceData.emit(parts[1])
-        elif cmd == 'unhandled_exception':
-            # todo
-            pass
-        elif cmd == 'update_modules':
-            modules = json.loads(parts[2])
-            # todo update onloads bases
-            self.onSetModules.emit(modules)
-        elif cmd == 'update_ranges':
-            self.onSetRanges.emit(json.loads(parts[2]))
-        elif cmd == 'watcher':
-            exception = json.loads(parts[1])
-            self.log('watcher hit op %s address %s @thread := %s' %
-                     (exception['memory']['operation'], exception['memory']['address'], parts[2]))
-        elif cmd == 'watcher_added':
-            self.onWatcherAdded.emit(parts[1], int(parts[2]))
-        elif cmd == 'watcher_removed':
-            self.onWatcherRemoved.emit(parts[1])
-        else:
-            print('unknown message: ' + what)
-
-    def _on_apply_context(self, context_data):
-        if 'context' in context_data:
-            context = Context(context_data['context'])
-            self.contexts[str(context_data['tid'])] = context
-
-            sym = ''
-            # if context and context.pc:
-            #    name = data['ptr']
-            if 'pc' in context.__dict__:
-                name = context_data['ptr']
-                if context.pc.symbol_name is not None:
-                    sym = '(%s - %s)' % (context.pc.symbol_module_name, context.pc.symbol_name)
-            else:
-                name = context_data['ptr']
-            self.app_window.threads.add_context(context_data, library_onload=self.loading_library)
-            if self.loading_library is None and context_data['reason'] == 0:
-                self.log('hook %s %s @thread := %d' % (name, sym, context_data['tid']))
-            # if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
-            #    return
-        else:
-            self.arch = context_data['arch']
-            self.platform = context_data['platform']
-            self.pointer_size = context_data['pointerSize']
-            self.java_available = context_data['java']
-            str_fmt = ('injected into := {0:d}'.format(self.pid))
-            self.log(str_fmt)
-
-        self.context_tid = context_data['tid']
-        if self.loading_library is not None:
-            self.loading_library = None
-
-    def on_destroyed(self):
-        self._reinitialize()
-        str_fmt = ('Detached from {0:d}. Script destroyed.'.format(self.pid))
-        self.log(str_fmt)
-        self.onScriptDestroyed.emit()
 
     def add_watcher(self, ptr=None):
         if ptr is None:
@@ -441,10 +450,10 @@ class Dwarf(QObject):
             tid = self.context_tid
         if args is not None and not isinstance(args, list):
             args = [args]
-        if self.script is None:
+        if self._script is None:
             return None
         try:
-            return self.script.exports.api(tid, api, args)
+            return self._script.exports.api(tid, api, args)
         except Exception as e:
             self.log(str(e))
             return None
@@ -486,7 +495,7 @@ class Dwarf(QObject):
         self.dwarf_api('hookOnLoad', input_)
 
     def log(self, what):
-        self.onLogToConsole.emit(what)
+        self.onLogToConsole.emit(str(what))
 
     def native_tracer_start(self, tid=0):
         if self.native_traced_tid > 0:
@@ -541,20 +550,179 @@ class Dwarf(QObject):
     def remove_watcher(self, ptr):
         return self.dwarf_api('removeWatcher', ptr)
 
-    ###########
-    #         #
-    # getters #
-    #         #
-    ###########
+    # ************************************************************************
+    # **************************** Handlers **********************************
+    # ************************************************************************
+    def _on_message(self, message, data):
+        QApplication.processEvents()
+        if 'payload' not in message:
+            print('payload: ' + message)
+            return
 
-    def get_emulator(self):
-        return self.emulator
+        what = message['payload']
+        parts = what.split(':::')
+        if len(parts) < 2:
+            print(what)
+            return
 
-    def get_kernel(self):
-        return self.kernel
+        cmd = parts[0]
+        if cmd == 'backtrace':
+            try:
+                self.app_window.backtrace_panel.set_backtrace(json.loads(parts[1]))
+            except:
+                pass
+        elif cmd == 'emulator':
+            self.onEmulator.emit(parts[1:])
+        elif cmd == 'enumerate_java_classes_start':
+            self.onEnumerateJavaClassesStart.emit()
+        elif cmd == 'enumerate_java_classes_match':
+            self.onEnumerateJavaClassesMatch.emit(parts[1])
+        elif cmd == 'enumerate_java_classes_complete':
+            self.onEnumerateJavaClassesComplete.emit()
+        elif cmd == 'enumerate_java_methods_complete':
+            self.onEnumerateJavaMethodsComplete.emit([parts[1], json.loads(parts[2])])
+        elif cmd == 'ftrace':
+            if self.app.get_ftrace_panel() is not None:
+                self.app.get_ftrace_panel().append_data(parts[1])
+        elif cmd == 'enable_kernel':
+            self.app_window.get_menu().enable_kernel_menu()
+        elif cmd == 'hook_java_callback':
+            h = Hook(Hook.HOOK_JAVA)
+            h.set_ptr(1)
+            h.set_input(parts[1])
+            if self.java_pending_args:
+                h.set_condition(self.java_pending_args['condition'])
+                h.set_logic(self.java_pending_args['logic'])
+                self.java_pending_args = None
+            self.java_hooks[h.get_input()] = h
+            self.onAddJavaHook.emit(h)
+        elif cmd == 'hook_native_callback':
+            h = Hook(Hook.HOOK_NATIVE)
+            h.set_ptr(int(parts[1], 16))
+            h.set_input(self.temporary_input)
+            h.set_bytes(binascii.unhexlify(parts[2]))
+            self.temporary_input = ''
+            h.set_condition(parts[4])
+            h.set_logic(parts[3])
+            self.native_pending_args = None
+            self.hooks[h.get_ptr()] = h
+            self.onAddNativeHook.emit(h)
+        elif cmd == 'hook_onload_callback':
+            h = Hook(Hook.HOOK_ONLOAD)
+            h.set_ptr(0)
+            h.set_input(parts[1])
+            self.on_loads[parts[1]] = h
+            self.onAddOnLoadHook.emit(h)
+        elif cmd == 'java_trace':
+            self.onJavaTraceEvent.emit(parts)
+        elif cmd == 'log':
+            self.log(parts[1])
+        elif cmd == 'memory_scan_match':
+            self.onMemoryScanMatch.emit([parts[1], parts[2], json.loads(parts[3])])
+        elif cmd == 'memory_scan_complete':
+            self.app_window.get_menu().on_bytes_search_complete()
+            self.onMemoryScanComplete.emit([parts[1] + ' complete', 0, 0])
+        elif cmd == 'onload_callback':
+            self.loading_library = parts[1]
+            str_fmt = ('Hook onload {0} @thread := {1}'.format(parts[1], parts[3]))
+            self.log(str_fmt)
+            self.onHitOnLoad.emit([parts[1], parts[2]])
+        elif cmd == 'release':
+            if parts[1] in self.contexts:
+                del self.contexts[parts[1]]
+            self.onThreadResumed.emit(int(parts[1]))
+        elif cmd == 'set_context':
+            data = json.loads(parts[1])
+            if 'modules' in data:
+                self.onSetModules.emit(data['modules'])
+            if 'ranges' in data:
+                self.onSetRanges.emit(data['ranges'])
 
-    def get_loading_library(self):
-        return self.loading_library
+            self.onApplyContext.emit(data)
+        elif cmd == 'set_data':
+            if data:
+                self.onSetData.emit(['raw', parts[1], data])
+            else:
+                self.onSetData.emit(['plain', parts[1], str(parts[2])])
+        elif cmd == 'script_loaded':
+            if self._spawned:
+                self.device.resume(self._pid)
+        elif cmd == 'tracer':
+            self.onTraceData.emit(parts[1])
+        elif cmd == 'unhandled_exception':
+            # todo
+            pass
+        elif cmd == 'update_modules':
+            modules = json.loads(parts[2])
+            # todo update onloads bases
+            self.onSetModules.emit(modules)
+        elif cmd == 'update_ranges':
+            self.onSetRanges.emit(json.loads(parts[2]))
+        elif cmd == 'watcher':
+            exception = json.loads(parts[1])
+            self.log('watcher hit op %s address %s @thread := %s' %
+                     (exception['memory']['operation'], exception['memory']['address'], parts[2]))
+        elif cmd == 'watcher_added':
+            self.onWatcherAdded.emit(parts[1], int(parts[2]))
+        elif cmd == 'watcher_removed':
+            self.onWatcherRemoved.emit(parts[1])
+        else:
+            print('unknown message: ' + what)
 
-    def get_native_traced_tid(self):
-        return self.native_traced_tid
+    def _on_apply_context(self, context_data):
+        if 'context' in context_data:
+            context = Context(context_data['context'])
+            self.contexts[str(context_data['tid'])] = context
+
+            sym = ''
+            # if context and context.pc:
+            #    name = data['ptr']
+            if 'pc' in context.__dict__:
+                name = context_data['ptr']
+                if context.pc.symbol_name is not None:
+                    sym = '(%s - %s)' % (context.pc.symbol_module_name, context.pc.symbol_name)
+            else:
+                name = context_data['ptr']
+            self.app_window.threads.add_context(context_data, library_onload=self.loading_library)
+            if self.loading_library is None and context_data['reason'] == 0:
+                self.log('hook %s %s @thread := %d' % (name, sym, context_data['tid']))
+            # if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
+            #    return
+        else:
+            self._arch = context_data['arch']
+            self._platform = context_data['platform']
+            self._pointer_size = context_data['pointerSize']
+            self.java_available = context_data['java']
+            str_fmt = ('injected into := {0:d}'.format(self.pid))
+            self.log(str_fmt)
+
+        self.context_tid = context_data['tid']
+        if self._loading_library is not None:
+            self._loading_library = None
+
+    def _on_destroyed(self):
+        self._reinitialize()
+        str_fmt = ('Detached from {0:d}. Script destroyed.'.format(self.pid))
+        self.log(str_fmt)
+        self.onScriptDestroyed.emit()
+
+    def _on_emulator(self, data):
+        if not self.app_window.emulator_panel:
+            self.app_window._create_ui_elem('emulator')
+            self.app_window.show_main_tab('emulator')
+
+        if self.emulator and self._emu_thread:
+            if not self._emu_thread.isRunning():
+                self._emu_thread.cmd = data
+                self._emu_thread.start()
+            else:
+                self._emu_queue.append(data)
+
+    def _on_emu_completed(self, result):
+        self.log(result)  # todo: send back to script???
+        if self._emu_queue:
+            self._emu_thread.cmd = self._emu_queue[0]
+            self._emu_queue = self._emu_queue[1:]
+            self._emu_thread.start()
+        else:
+            self._emu_thread.cmd = ''
