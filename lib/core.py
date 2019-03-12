@@ -38,65 +38,6 @@ from lib.prefs import Prefs
 from ui.dialog_input import InputDialog
 from ui.panel_trace import TraceEvent
 
-"""
-class DwarfScript(Script):
-
-    def __init__(self, impl):
-        super().__init__(impl=impl)
-
-    def _on_message(self, raw_message, data):
-        if isinstance(raw_message, dict):
-            raw_message = json.dumps(raw_message)
-        return super()._on_message(raw_message, data)
-
-class DwarfDevice(Device):
-
-    def __init__(self, device):
-        super().__init__(device=device)
-        self._attached = False
-        self._spawned = False
-        self._pid = 0
-
-    def __repr__(self):
-        return repr(self._impl)
-
-    def _pid_of(self, target):
-        self._pid = super()._pid_of(target)
-        return self._pid
-
-    def spawn_and_attach(self, program, **kwargs):
-        self._spawned = True
-        pid = self.spawn(program)
-        return self.attach(pid)
-
-    @property
-    def pid(self):
-        return self._pid
-
-    @property
-    def spawned(self):
-        return self._spawned
-
-    @property
-    def attached(self):
-        return self._attached
-
-class DwarfSession(Session):
-
-    def __init__(self, impl):
-        super().__init__(impl=impl)
-        self._is_v8_eng = False
-
-    @property
-    def v8_engine(self):
-        return self._is_v8_eng
-
-    @v8_engine.setter
-    def v8_engine(self, value):
-        self._is_v8_eng = value
-        self.enable_jit()
-"""
-
 
 class NoDeviceAssignedError(Exception):
     """ Raised when no Device
