@@ -114,9 +114,9 @@ class DwarfListView(QTreeView):
 
         return None
 
-    def contains_text(self, text, break_at_first=True, case_sensitive=False):
+    def contains_text(self, text, case_sensitive=False, stop_at_match=True):
         """ looks in all fields for text
-            returns true, [row, col] if text exists
+            returns true, [[row, col]] if text exists
         """
         ret_val = False
         ret_res = []
@@ -126,11 +126,11 @@ class DwarfListView(QTreeView):
                     item_text = self.get_item_text(i, j)
                     if case_sensitive and (item_text == text):
                         ret_res.append([i, j])
-                        if break_at_first:
+                        if stop_at_match:
                             break
                     elif not case_sensitive and (item_text.lower() == text.lower()):
                         ret_res.append([i, j])
-                        if break_at_first:
+                        if stop_at_match:
                             break
 
         if ret_res:
