@@ -114,26 +114,32 @@ class DwarfListView(QTreeView):
 
         return None
 
-    def contains_text(self, text, case_sensitive=False):
+    def contains_text(self, text, break_at_first=True, case_sensitive=False):
         """ looks in all fields for text
             returns true, [row, col] if text exists
         """
         ret_val = False
+        ret_res = []
         if self.model() is not None:
             for i in range(self.model().rowCount()):
                 for j in range(self.model().columnCount()):
                     item_text = self.get_item_text(i, j)
                     if case_sensitive and (item_text == text):
-                        ret_val = True
-                        break
+                        ret_res.append([i, j])
+                        if break_at_first:
+                            break
                     elif not case_sensitive and (item_text.lower() == text.lower()):
-                        ret_val = True
-                        break
+                        ret_res.append([i, j])
+                        if break_at_first:
+                            break
+
+        if ret_res:
+            ret_val = True
 
         if ret_val:
-            return ret_val, [i, j]
+            return ret_val, ret_res
         else:
-            return ret_val, None
+            return ret_val, ret_res
 
     def number_of_items(self):
         """ returns number of rows
