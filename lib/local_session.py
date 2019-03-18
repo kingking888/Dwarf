@@ -114,10 +114,10 @@ class LocalSession(Session):
 
     def _on_proc_resume(self, tid=0):
         if tid == 0:
+            # self.dwarf.device.resume(self.dwarf.pid)
             self._app_window.contexts_list_panel.clear()
             self._app_window.context_panel.clear()
             # self._app_window.backtrace_panel.setRowCount(0)
-            self._app_window.memory_panel.clear_panel()
             self.dwarf.contexts.clear()
 
         self.dwarf.dwarf_api('release', tid)

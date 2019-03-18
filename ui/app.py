@@ -307,7 +307,7 @@ class AppWindow(QMainWindow):
             self.memory_panel = MemoryPanel(self)
             self.memory_panel.onShowDisassembly.connect(
                 self._disassemble_range)
-            # self.memory_panel.dataChanged.connect(self.on_memory_modified)
+            self.memory_panel.dataChanged.connect(self._on_memory_modified)
             self.memory_panel.statusChanged.connect(self.set_status_text)
             self.main_tabs.addTab(self.memory_panel, 'Memory')
         elif elem == 'javaexplorer':
@@ -368,10 +368,9 @@ class AppWindow(QMainWindow):
             self.trace_panel = TracePanel(self)
             self.main_tabs.addTab(self.trace_panel, 'Trace')
         elif elem == 'disassembly':
-            #from ui.panel_asm import AsmPanel
             from ui.disasm_view import DisassemblyView
-            #self.asm_panel = AsmPanel(self)
             self.asm_panel = DisassemblyView(self)
+            self.asm_panel.onShowMemoryRequest.connect(self._on_disasm_showmem)
             self.main_tabs.addTab(self.asm_panel, 'Disassembly')
         elif elem == 'emulator':
             from ui.panel_emulator import EmulatorPanel
@@ -591,10 +590,10 @@ class AppWindow(QMainWindow):
 
         if self.dwarf:
             self.dwarf.detach()
-        super(AppWindow, self).closeEvent(event)
+        super().closeEvent(event)
 
     def _on_watcher_clicked(self, ptr):
-        """ Address in Watcherpanel was clicked
+        """ Address in Watcher/Hookpanel was clicked
             show Memory
         """
         if '.' in ptr:  # java_hook
@@ -607,6 +606,14 @@ class AppWindow(QMainWindow):
         else:
             self.memory_panel.read_memory(ptr=ptr)
             self.show_main_tab('memory')
+
+    def _on_disasm_showmem(self, ptr, length):
+        """ Address in Disasm was clicked
+            adds temphighlight for bytes from current instruction
+        """
+        self.memory_panel.add_highlight(HighLight('attention', utils.parse_ptr(ptr), length))
+        self.memory_panel.read_memory(ptr)
+        self.show_main_tab('memory')
 
     def _on_watcher_added(self, ptr):
         """ Watcher Entry was added
@@ -782,3 +789,13 @@ class AppWindow(QMainWindow):
 
     def _on_attached(self, data):
         self.setWindowTitle('Dwarf - Attached to %s (%s)' % (data[1], data[0]))
+
+    def _on_memory_modified(self, pos, length):
+        data_pos = self.memory_panel.base + pos
+        data = self.memory_panel.data[pos:pos + length]
+        data = [data[0]]  # todo: strange js part
+
+        if self.dwarf.dwarf_api('writeBytes', [data_pos, data]):
+            pass
+        else:
+            utils.show_message_box('Failed to write Memory')

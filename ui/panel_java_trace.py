@@ -14,7 +14,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 import json
 from math import ceil, floor
 from PyQt5.QtCore import Qt, pyqtSignal, QRectF, QPoint
-from PyQt5.QtGui import QPainter, QColor, QTextOption, QFontMetrics, QFont, QPolygon, QBrush, QTextFormat
+from PyQt5.QtGui import QPainter, QColor, QTextOption, QFontMetrics, QFont, QPolygon, QBrush, QTextFormat, QIcon
 from PyQt5.QtWidgets import QSplitter, QListWidget, QScrollBar, QMenu, QWidget, QVBoxLayout, QPushButton, QAbstractScrollArea, QToolBar, QLabel, QSpacerItem, QSizePolicy
 
 from ui.dialog_input import InputDialog, QHBoxLayout
@@ -240,11 +240,16 @@ class JavaTracePanel(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
 
+        self._record_icon = QIcon(utils.resource_path('assets/icons/record.png'))
+        self._pause_icon = QIcon(utils.resource_path('assets/icons/pause.png'))
+        self._stop_icon = QIcon(utils.resource_path('assets/icons/stop.png'))
+
         self._tool_bar = QToolBar()
-        self._tool_bar.setContentsMargins(5, 5, 5, 5)
-        self._tool_bar.addAction('Start', self.start_trace)
-        self._tool_bar.addAction('Pause', self.pause_trace)
-        self._tool_bar.addAction('Stop', self.stop_trace)
+        self._tool_bar.setFixedHeight(16)
+        self._tool_bar.setContentsMargins(1, 1, 1, 1)
+        self._tool_bar.addAction(self._record_icon, 'Record', self.start_trace)
+        self._tool_bar.addAction(self._pause_icon, 'Pause', self.pause_trace)
+        self._tool_bar.addAction(self._stop_icon, 'Stop', self.stop_trace)
         self._tool_bar.addSeparator()
         self._entries_lbl = QLabel('Entries: 0')
         self._entries_lbl.setAlignment(Qt.AlignRight)

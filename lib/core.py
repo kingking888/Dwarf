@@ -84,8 +84,7 @@ class Dwarf(QObject):
     onSetModules = pyqtSignal(list, name='onSetModules')
     onHitOnLoad = pyqtSignal(list, name='onHitOnLoad')
     onLogToConsole = pyqtSignal(str, name='onLogToConsole')
-    onTraceData = pyqtSignal(str, name='onTraceData')
-    onSetData = pyqtSignal(list, name='onSetData')
+    # thread+context
     onThreadResumed = pyqtSignal(int, name='onThreadResumed')
     onApplyContext = pyqtSignal(dict, name='onApplyContext')
     # java
@@ -98,6 +97,9 @@ class Dwarf(QObject):
     onMemoryScanMatch = pyqtSignal(list, name='onMemoryScanMatch')
     # trace
     onJavaTraceEvent = pyqtSignal(list, name='onJavaTraceEvent')
+    onTraceData = pyqtSignal(str, name='onTraceData')
+    onSetData = pyqtSignal(list, name='onSetData')
+    # emulator
     onEmulator = pyqtSignal(list, name='onEmulator')
 
     # ************************************************************************
@@ -141,13 +143,14 @@ class Dwarf(QObject):
         # tracers
         self._native_traced_tid = 0
 
-        # core utils
+        # emulator stuff
         self._emulator = Emulator(self)
         self._emu_thread = EmulatorThread(self)
         self._emu_thread.onCmdCompleted.connect(self._on_emu_completed)
         self._emu_thread.emulator = self.emulator
         self._emu_queue = []
 
+        # connect to self
         self.onApplyContext.connect(self._on_apply_context)
         self.onEmulator.connect(self._on_emulator)
 
@@ -234,13 +237,10 @@ class Dwarf(QObject):
         except ValueError:
             self._device = None
 
-    @property
-    def emulator(self):
-        return self._emulator
-
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************
+
     def attach(self, pid, script=None, print_debug_error=True):
         """ Attach to pid
         """
@@ -497,7 +497,7 @@ class Dwarf(QObject):
     def _on_message(self, message, data):
         QApplication.processEvents()
         if 'payload' not in message:
-            print('payload: ' + message)
+            print('payload: ' + str(message))
             return
 
         what = message['payload']
@@ -616,12 +616,12 @@ class Dwarf(QObject):
             self.contexts[str(context_data['tid'])] = context
 
             sym = ''
-            # if context and context.pc:
-            #    name = data['ptr']
-            if 'pc' in context.__dict__:
+            if 'pc' in context_data['context']:
                 name = context_data['ptr']
-                if context.pc.symbol_name is not None:
-                    sym = '(%s - %s)' % (context.pc.symbol_module_name, context.pc.symbol_name)
+                if context_data['context']['pc']['symbol']['name'] is not None:
+                    sym = context_data['context']['pc']['symbol']['moduleName']
+                    sym += ' - '
+                    sym += context_data['context']['pc']['symbol']['name']
             else:
                 name = context_data['ptr']
             self.app_window.threads.add_context(context_data, library_onload=self.loading_library)

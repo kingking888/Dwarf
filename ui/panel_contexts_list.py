@@ -97,6 +97,8 @@ class ContextsListPanel(DwarfListView):
             symb_col.setText(str_fmt)
 
         self.threads_model.appendRow([tid, pc_col, symb_col])
+        self.resizeColumnToContents(0)
+        self.resizeColumnToContents(1)
 
     def resume_tid(self, tid):
         # todo: check why removing here and removing in on_proc_resume
@@ -118,7 +120,7 @@ class ContextsListPanel(DwarfListView):
             glbl_pt = self.mapToGlobal(pos)
             context_menu = QMenu()
             context_menu.addAction('Emulator', self._on_cm_emulator)
-            if self.dwarf.get_native_traced_tid() == tid:
+            if self.dwarf.native_trace_tid == tid:
                 context_menu.addAction('Stop Trace', self.dwarf.native_tracer_stop)
             else:
                 context_menu.addAction('Trace', lambda: self._on_cm_starttrace(tid))

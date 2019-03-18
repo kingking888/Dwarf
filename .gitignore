@@ -16,3 +16,7 @@ tools
 desktop.ini
 dwarf_window_pos.ini
 linter.py
+#Virtualenv
+venv
+venv3
+env

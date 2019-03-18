@@ -42,7 +42,7 @@ class ContextPanel(QTabWidget):
         self._nativectx_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
                                             Qt.TextAlignmentRole)
         self._nativectx_model.setHeaderData(1, Qt.Horizontal, 'Value')
-        #self._nativectx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+        self._nativectx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._nativectx_model.setHeaderData(2, Qt.Horizontal, 'Decimal')
         #self._nativectx_model.setHeaderData(2, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._nativectx_model.setHeaderData(3, Qt.Horizontal, 'Telescope')
@@ -66,7 +66,7 @@ class ContextPanel(QTabWidget):
         self._emulatorctx_model.setHeaderData(0, Qt.Horizontal, Qt.AlignCenter,
                                               Qt.TextAlignmentRole)
         self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, 'Value')
-        #self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+        self._emulatorctx_model.setHeaderData(1, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
         self._emulatorctx_model.setHeaderData(2, Qt.Horizontal, 'Decimal')
 
         self._emulatorctx_list = DwarfListView()
@@ -205,6 +205,8 @@ class ContextPanel(QTabWidget):
 
             self._nativectx_model.appendRow(
                 [reg_name, value_x, value_dec, telescope])
+            self._nativectx_list.resizeColumnToContents(0)
+            self._nativectx_list.resizeColumnToContents(1)
 
     def _set_emulator_context(self, ptr, context):
         if self.indexOf(self._emulatorctx_list) == -1:
@@ -244,6 +246,8 @@ class ContextPanel(QTabWidget):
                     value_dec.setText('{0:d}'.format(context[register]))
 
             self._emulatorctx_model.appendRow([reg_name, value_x, value_dec])
+            self._emulatorctx_list.resizeColumnToContents(0)
+            self._emulatorctx_list.resizeColumnToContents(1)
 
     def _set_java_context(self, ptr, context):
         if self.indexOf(self._javactx_list) == -1:
@@ -269,6 +273,8 @@ class ContextPanel(QTabWidget):
                 _value.setForeground(Qt.gray)
 
             self._javactx_model.appendRow([_arg, _class, _value])
+            self._javactx_list.resizeColumnToContents(0)
+            self._javactx_list.resizeColumnToContents(1)
 
     # ************************************************************************
     # **************************** Handlers **********************************
@@ -280,7 +286,7 @@ class ContextPanel(QTabWidget):
         if index != -1:
             context_menu.addAction(
                 'Copy Address', lambda: utils.copy_hex_to_clipboard(
-                    self._nativectx_model.item(index, 4).text()))
+                    self._nativectx_model.item(index, 1).text()))
         context_menu.exec_(glbl_pt)
 
     def _on_emulator_contextmenu(self, pos):
