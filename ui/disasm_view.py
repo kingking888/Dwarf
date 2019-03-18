@@ -32,7 +32,7 @@ class DisassemblyView(QAbstractScrollArea):
         self._char_height = self.fontMetrics().height()
         self._base_line = self.fontMetrics().ascent()
 
-        self._history = {}
+        self._history = []
         self._lines = []
         self._range = None
         self._max_instructions = 128
@@ -99,12 +99,10 @@ class DisassemblyView(QAbstractScrollArea):
         QApplication.processEvents()
 
         # self._lines.clear()
-        """if dwarf_range.start_address in self._history:
-            self._lines = self._history[dwarf_range.start_address]
-            self._range = dwarf_range
-            self.adjust()
-            self.progrss.cancel()
-            return"""
+        if len(self._history) == 0 or self._history[len(self._history) - 1] != dwarf_range.start_address:
+            self._history.append(dwarf_range.start_address)
+            if len(self._history) > 25:
+                self._history.pop(0)
 
         self._longest_bytes = 0
         capstone = Cs(self.capstone_arch, self.capstone_mode)
@@ -176,7 +174,6 @@ class DisassemblyView(QAbstractScrollArea):
     #    return super().mousePressEvent(self, QMouseEvent)
 
     def read_memory(self, ptr, length=0):
-        #self._history[self._range.start_address] = self._lines.copy()
         self._lines.clear()
 
         if self._range is None:
@@ -204,6 +201,15 @@ class DisassemblyView(QAbstractScrollArea):
                     if self._follow_jumps and self._lines[index + self.pos].is_jump:
                         new_pos = self._lines[index + self.pos].jump_address
                         self.read_memory(new_pos)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Backspace:
+            if len(self._history) > 1:
+                self._history.pop(len(self._history) - 1)
+                self.read_memory(self._history[len(self._history) - 1])
+        else:
+            # dispatch those to super
+            super().keyPressEvent(event)
 
     # pylint: disable=C0103
     def mouseMoveEvent(self, event):
