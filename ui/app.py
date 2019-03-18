@@ -50,6 +50,7 @@ class AppWindow(QMainWindow):
         self.session_manager.sessionClosed.connect(self.session_closed)
 
         self.menu = self.menuBar()
+        self._is_newer_dwarf = False
         self.view_menu = None
 
         self.asm_panel = None
@@ -155,6 +156,7 @@ class AppWindow(QMainWindow):
         if self.dwarf_args.package is None:
             self.welcome_window = WelcomeDialog(self)
             self.welcome_window.setModal(True)
+            self.welcome_window.onIsNewerVersion.connect(self._enable_update_menu)
             self.welcome_window.onUpdateComplete.connect(self._on_dwarf_updated)
             self.welcome_window.setWindowTitle(
                 'Welcome to DWARF - A debugger for reverse engineers, crackers and security analyst'
@@ -180,6 +182,8 @@ class AppWindow(QMainWindow):
     def _setup_main_menu(self):
         self.menu = self.menuBar()
         dwarf_menu = QMenu('DWARF', self)
+        if self._is_newer_dwarf:
+            dwarf_menu.addAction('Update', self._update_dwarf)
         dwarf_menu.addAction('Exit', self.session_closed)
         self.menu.addMenu(dwarf_menu)
 
@@ -209,6 +213,13 @@ class AppWindow(QMainWindow):
         about_menu.addSeparator()
         about_menu.addAction('Info')
         self.menu.addMenu(about_menu)
+
+    def _enable_update_menu(self):
+        self._is_newer_dwarf = True
+
+    def _update_dwarf(self):
+        if self.welcome_window:
+            self.welcome_window._update_dwarf()
 
     def _on_dwarf_updated(self):
         self.onRestart.emit()
@@ -611,8 +622,8 @@ class AppWindow(QMainWindow):
         """ Address in Disasm was clicked
             adds temphighlight for bytes from current instruction
         """
-        self.memory_panel.add_highlight(HighLight('attention', utils.parse_ptr(ptr), length))
         self.memory_panel.read_memory(ptr)
+        self.memory_panel.add_highlight(HighLight('attention', utils.parse_ptr(ptr), length))
         self.show_main_tab('memory')
 
     def _on_watcher_added(self, ptr):

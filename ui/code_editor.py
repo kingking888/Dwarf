@@ -35,7 +35,16 @@ class DwarfCompleter(QCompleter):
             'hookAllJavaMethods', 'hookJava', 'hookNative'
             'hookOnLoad', 'javaBacktrace', 'isAddressWatched',
             'nativeBacktrace', 'release', 'removeWatcher', 'restart',
-            'setData', 'startNativeTracer', 'stopNativeTracer'
+            'setData',
+            # trace
+            'startNativeTracer',
+            'stopNativeTracer',
+            # emu
+            'emulator',
+            'emulator.clean()',
+            'emulator.start(',
+            'emulator.step()',
+            'emulator.stop()',
         ]
         QCompleter.__init__(self, myKeywords, parent)
         self.setCompletionMode(QCompleter.PopupCompletion)

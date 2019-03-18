@@ -254,7 +254,18 @@ class EmulatorPanel(QWidget):
         pass
 
     def on_emulator_stop(self):
-        pass
+        self.app.context_panel.set_context(0, 2, self.emulator.current_context)
+        # check if the previous hook is waiting for a register result
+        if self._require_register_result is not None:
+            row = 1
+            res = '%s = %s' % (self._require_register_result[1],
+                               hex(self.emulator.uc.reg_read(self._require_register_result[0])))
+            if len(self.assembly._lines) > 1:
+                if self.assembly._lines[len(self.assembly._lines) - row] is None:
+                    row = 2
+                self.assembly._lines[len(self.assembly._lines) - row].string = res
+                # invalidate
+                self._require_register_result = None
 
     def ranges_item_double_clicked(self, model_index):
         row = self._ranges_model.itemFromIndex(model_index).row()

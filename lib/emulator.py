@@ -68,6 +68,7 @@ class Emulator(QThread):
         self.dwarf = dwarf
         self._prefs = Prefs()
 
+        self._setup_done = False
         self._blacklist_regs = []
 
         self.cs = None
@@ -82,6 +83,8 @@ class Emulator(QThread):
         self.stepping = [False, False]
         self._current_instruction = 0
         self._current_cpu_mode = 0
+
+        self._request_stop = False
 
         # configurations
         self.callbacks_path = None
@@ -119,7 +122,7 @@ class Emulator(QThread):
 
     def setup_x64(self):
         self.uc = unicorn.Uc(unicorn.UC_ARCH_X86, unicorn.UC_MODE_64)
-        self.cs = Cs(CS_ARCH_X86, CS_MODE_64 | CS_MODE_LITTLE_ENDIAN)
+        self.cs = Cs(CS_ARCH_X86, CS_MODE_64)
 
     def _setup(self):
         if self.dwarf.arch == 'arm':
@@ -148,26 +151,31 @@ class Emulator(QThread):
         self.current_context = EmulatorContext(self.dwarf)
         for reg in self.current_context._unicorn_registers:
             if reg in self.context.__dict__:
-                self.uc.reg_write(self.current_context._unicorn_registers[reg], self.context.__dict__[reg].value)
+                if reg not in self._blacklist_regs:
+                    self.uc.reg_write(self.current_context._unicorn_registers[reg], self.context.__dict__[reg].value)
 
         self.uc.hook_add(unicorn.UC_HOOK_CODE, self.hook_code)
         self.uc.hook_add(unicorn.UC_HOOK_MEM_WRITE | unicorn.UC_HOOK_MEM_READ,
                          self.hook_mem_access)
         self.uc.hook_add(
-            unicorn.UC_HOOK_MEM_FETCH_UNMAPPED |
-            unicorn.UC_HOOK_MEM_WRITE_UNMAPPED |
-            unicorn.UC_HOOK_MEM_READ_UNMAPPED, self.hook_unmapped)
+            unicorn.UC_HOOK_MEM_FETCH_UNMAPPED
+            | unicorn.UC_HOOK_MEM_WRITE_UNMAPPED
+            | unicorn.UC_HOOK_MEM_READ_UNMAPPED, self.hook_unmapped)
         self.current_context.set_context(self.uc)
-        return err
+        return True
 
     def run(self):
+        # dont call this func
+        if not self._setup_done:
+            return
         try:
-            self.uc.emu_start(self._start_address, self._end_address)
+            self.uc.emu_start(self._start_address, 0xffffffffffffffff)  # end is handled in hook_code
         except unicorn.UcError as e:
             self.log_to_ui('[*] error: ' + str(e))
         except Exception as e:
             self.log_to_ui('[*] error: ' + str(e))
 
+        self._setup_done = False
         self.onEmulatorStop.emit()
 
     def api(self, parts):
@@ -186,16 +194,21 @@ class Emulator(QThread):
 
     def clean(self):
         if self.isRunning():
-            return 1
+            return False
 
         self.stepping = [False, False]
         self._current_instruction = 0
         self._current_cpu_mode = 0
 
-        return self.__setup()
+        return self._setup()
 
     def hook_code(self, uc, address, size, user_data):
         # QApplication.processEvents()
+        if self._request_stop:
+            self.log_to_ui('Error: Emulator stopped - reached end')
+            self.stop()
+            return
+
         if self._current_instruction == address:
             # we should never be here or it is looping
             self.log_to_ui('Error: Emulator stopped - looping')
@@ -203,9 +216,19 @@ class Emulator(QThread):
 
         self._current_instruction = address
 
-        if address == self._end_address:
-            self.log_to_ui('Error: Emulator stopped - reached: ' + hex(address))
-            self.stop()
+        # check if pc/eip is end_ptr
+        pc = 0  # address should be pc too ???
+        if self.dwarf.arch == 'arm':
+            pc = uc.reg_read(unicorn.arm_const.UC_ARM_REG_PC)
+        elif self.dwarf.arch == 'arm64':
+            pc = uc.reg_read(unicorn.arm64_const.UC_ARM64_REG_PC)
+        elif self.dwarf.arch == 'ia32':
+            pc = uc.reg_read(unicorn.x86_const.UC_X86_REG_EIP)
+        elif self.dwarf.arch == 'x64':
+            pc = uc.reg_read(unicorn.x86_const.UC_X86_REG_RIP)
+
+        if pc == self._end_address:
+            self._request_stop = True
 
         # set the current context
         self.current_context.set_context(uc)
@@ -328,6 +351,12 @@ class Emulator(QThread):
 
         return True
 
+    def start(self, priority=QThread.HighPriority):
+        # dont call this func
+        if not self._setup_done:
+            return
+        return super().start(priority=priority)
+
     def emulate(self, until=0):
         if self.isRunning():
             raise EmulatorAlreadyRunningError()
@@ -394,12 +423,13 @@ class Emulator(QThread):
         # until is 0 (i.e we are stepping)
         if until == 0:
             self.stepping = [True, False]
-            self.end_ptr = address + (self.dwarf.pointer_size * 2)
+            # self.end_ptr = address + (self.dwarf.pointer_size * 2) stupid
         else:
             self.stepping = [False, False]
 
         self._start_address = address
         self._end_address = self.end_ptr
+        self._setup_done = True
         self.start()
 
     def stop(self):

@@ -142,6 +142,7 @@ class WelcomeDialog(QDialog):
 
     onSessionSelected = pyqtSignal(str, name='onSessionSelected')
     onUpdateComplete = pyqtSignal(name='onUpdateComplete')
+    onIsNewerVersion = pyqtSignal(name='onIsNewerVersion')
 
     def __init__(self, parent=None):
         super(WelcomeDialog, self).__init__(parent=parent)
@@ -251,6 +252,7 @@ class WelcomeDialog(QDialog):
 
     def _on_dwarf_isupdate(self):
         self.update_bar.setVisible(True)
+        self.onIsNewerVersion.emit()
 
     def _update_dwarf(self):
         self._update_thread = DwarfUpdateThread(self)

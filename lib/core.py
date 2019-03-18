@@ -108,7 +108,7 @@ class Dwarf(QObject):
     def __init__(self, session=None, parent=None, device=None):
         super(Dwarf, self).__init__(parent=parent)
 
-        self.app_window = parent
+        self._app_window = parent
 
         self.java_available = False
         self._loading_library = False
@@ -354,18 +354,18 @@ class Dwarf(QObject):
 
     def add_watcher(self, ptr=None):
         if ptr is None:
-            ptr, input = InputDialog.input_pointer(self.app_window)
+            ptr, input = InputDialog.input_pointer(self._app_window)
             if ptr == 0:
                 return
         return self.dwarf_api('addWatcher', ptr)
 
     def dump_memory(self, file_path=None, ptr=0, length=0):
         if ptr == 0:
-            ptr, inp = InputDialog.input_pointer(self.app_window)
+            ptr, inp = InputDialog.input_pointer(self._app_window)
         if ptr > 0:
             if length == 0:
                 accept, length = InputDialog.input(
-                    self.app_window, hint='insert length', placeholder='1024')
+                    self._app_window, hint='insert length', placeholder='1024')
                 if not accept:
                     return
                 try:
@@ -376,7 +376,7 @@ class Dwarf(QObject):
                 except:
                     return
             if file_path is None:
-                r = QFileDialog.getSaveFileName(self.app_window, caption='Save binary dump to file')
+                r = QFileDialog.getSaveFileName(self._app_window, caption='Save binary dump to file')
                 if len(r) == 0 or len(r[0]) == 0:
                     return
                 file_path = r[0]
@@ -402,7 +402,7 @@ class Dwarf(QObject):
     def hook_java(self, input_=None, pending_args=None):
         if input_ is None or not isinstance(input_, str):
             accept, input_ = InputDialog.input(
-                self.app_window, hint='insert java class or methos',
+                self._app_window, hint='insert java class or methos',
                 placeholder='com.package.class or com.package.class.method')
             if not accept:
                 return
@@ -412,9 +412,9 @@ class Dwarf(QObject):
 
     def hook_native(self, input_=None, pending_args=None, own_input=None):
         if input_ is None or not isinstance(input_, str):
-            ptr, input_ = InputDialog.input_pointer(self.app_window)
+            ptr, input_ = InputDialog.input_pointer(self._app_window)
         else:
-            ptr = utils.parse_ptr(self.app_window.dwarf.dwarf_api('evaluatePtr', input_))
+            ptr = utils.parse_ptr(self._app_window.dwarf.dwarf_api('evaluatePtr', input_))
         if ptr > 0:
             self.temporary_input = input_
             if own_input is not None:
@@ -424,13 +424,13 @@ class Dwarf(QObject):
 
     def hook_onload(self, input_=None):
         if input_ is None or not isinstance(input_, str):
-            accept, input_ = InputDialog.input(self.app_window, hint='insert module name', placeholder='libtarget.so')
+            accept, input_ = InputDialog.input(self._app_window, hint='insert module name', placeholder='libtarget.so')
             if not accept:
                 return
             if len(input_) == 0:
                 return
 
-        if input_ in self.app_window.dwarf.on_loads:
+        if input_ in self._app_window.dwarf.on_loads:
             return
 
         self.dwarf_api('hookOnLoad', input_)
@@ -442,7 +442,7 @@ class Dwarf(QObject):
         if self.native_traced_tid > 0:
             return
         if tid == 0:
-            accept, tid = InputDialog.input(self.app_window, hint='insert thread id to trace', placeholder=str(self.pid))
+            accept, tid = InputDialog.input(self._app_window, hint='insert thread id to trace', placeholder=str(self.pid))
             if not accept:
                 return
             try:
@@ -459,10 +459,10 @@ class Dwarf(QObject):
         if self.native_traced_tid == 0:
             return
         self.dwarf_api('stopNativeTracer')
-        if self.app_window.trace_panel is not None:
-            self.app_window.trace_panel.stop()
+        if self._app_window.trace_panel is not None:
+            self._app_window.trace_panel.stop()
         self.native_traced_tid = 0
-        # self.app_window.get_menu().on_native_tracer_change(False)
+        # self._app_window.get_menu().on_native_tracer_change(False)
 
     def read_memory(self, ptr, len):
         if len > 1024 * 1024:
@@ -509,7 +509,7 @@ class Dwarf(QObject):
         cmd = parts[0]
         if cmd == 'backtrace':
             try:
-                self.app_window.backtrace_panel.set_backtrace(json.loads(parts[1]))
+                self._app_window.backtrace_panel.set_backtrace(json.loads(parts[1]))
             except:
                 pass
         elif cmd == 'emulator':
@@ -526,7 +526,7 @@ class Dwarf(QObject):
             if self.app.get_ftrace_panel() is not None:
                 self.app.get_ftrace_panel().append_data(parts[1])
         elif cmd == 'enable_kernel':
-            self.app_window.get_menu().enable_kernel_menu()
+            self._app_window.get_menu().enable_kernel_menu()
         elif cmd == 'hook_java_callback':
             h = Hook(Hook.HOOK_JAVA)
             h.set_ptr(1)
@@ -561,7 +561,7 @@ class Dwarf(QObject):
         elif cmd == 'memory_scan_match':
             self.onMemoryScanMatch.emit([parts[1], parts[2], json.loads(parts[3])])
         elif cmd == 'memory_scan_complete':
-            self.app_window.get_menu().on_bytes_search_complete()
+            self._app_window.get_menu().on_bytes_search_complete()
             self.onMemoryScanComplete.emit([parts[1] + ' complete', 0, 0])
         elif cmd == 'onload_callback':
             self.loading_library = parts[1]
@@ -624,10 +624,10 @@ class Dwarf(QObject):
                     sym += context_data['context']['pc']['symbol']['name']
             else:
                 name = context_data['ptr']
-            self.app_window.threads.add_context(context_data, library_onload=self.loading_library)
+            self._app_window.threads.add_context(context_data, library_onload=self.loading_library)
             if self.loading_library is None and context_data['reason'] == 0:
                 self.log('hook %s %s @thread := %d' % (name, sym, context_data['tid']))
-            # if len(self.contexts.keys()) > 1 and self.app_window.context_panel.have_context():
+            # if len(self.contexts.keys()) > 1 and self._app_window.context_panel.have_context():
             #    return
         else:
             self._arch = context_data['arch']
@@ -648,9 +648,9 @@ class Dwarf(QObject):
         self.onScriptDestroyed.emit()
 
     def _on_emulator(self, data):
-        if not self.app_window.emulator_panel:
-            self.app_window._create_ui_elem('emulator')
-            self.app_window.show_main_tab('emulator')
+        if not self._app_window.emulator_panel:
+            self._app_window._create_ui_elem('emulator')
+            self._app_window.show_main_tab('emulator')
 
         if self.emulator and self._emu_thread:
             if not self._emu_thread.isRunning():

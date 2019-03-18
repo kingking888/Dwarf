@@ -275,7 +275,7 @@ class HooksPanel(QWidget):
                 item.setData(input_, Qt.UserRole + 2)
                 if not item.text():
                     item.setText('ƒ')
-                    item.setToolTip(input_)
+                item.setToolTip(input_)
                 self.onHookChanged.emit(ptr)
 
     def _on_modify_condition(self, num_row):
@@ -295,7 +295,7 @@ class HooksPanel(QWidget):
                 item.setData(input_, Qt.UserRole + 2)
                 if not item.text():
                     item.setText('ƒ')
-                    item.setToolTip(input_)
+                item.setToolTip(input_)
                 self.onHookChanged.emit(ptr)
 
     # + button
