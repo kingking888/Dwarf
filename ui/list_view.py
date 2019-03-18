@@ -116,7 +116,7 @@ class DwarfListView(QTreeView):
 
     def contains_text(self, text, case_sensitive=False):
         """ looks in all fields for text
-            returns true if text exists
+            returns true, [row, col] if text exists
         """
         ret_val = False
         if self.model() is not None:
@@ -130,7 +130,10 @@ class DwarfListView(QTreeView):
                         ret_val = True
                         break
 
-        return ret_val
+        if ret_val:
+            return ret_val, [i, j]
+        else:
+            return ret_val, None
 
     def number_of_items(self):
         """ returns number of rows
