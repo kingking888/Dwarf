@@ -230,6 +230,8 @@ class DeviceBar(QWidget):
                 else:
                     if self.updated_frida_version != device_frida:
                         self._update_btn.setVisible(True)
+                        if self._adb.is_frida_running():
+                            self.onDeviceUpdated.emit()
                     elif device_frida and not self._adb.is_frida_running():
                         self._start_btn.setVisible(True)
                     elif device_frida and self._adb.is_frida_running():
