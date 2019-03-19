@@ -262,6 +262,7 @@ class DeviceBar(QWidget):
         self.update_label.setStyleSheet('background-color: crimson;')
         self.update_label.setText(text)
         self._install_btn.setVisible(True)
+        self._update_btn.setVisible(False)
 
     def _on_device(self):
         self._timer_step = 4
@@ -290,6 +291,7 @@ class DeviceBar(QWidget):
             try:
                 if self._adb.available() and request_url.index('https://') == 0:
                     self._install_btn.setVisible(False)
+                    self._update_btn.setVisible(False)
 
                     if self._update_thread is not None:
                         if not self._update_thread.isRunning():
