@@ -154,9 +154,16 @@ class DisassemblyView(QAbstractScrollArea):
 
     def disassemble(self, dwarf_range, num_instructions=256, stop_on_ret=True):
         self.progrss = QProgressDialog()
+        self.progrss.setFixedSize(300, 50)
+        self.progrss.setAutoFillBackground(True)
         self.progrss.setWindowModality(Qt.WindowModal)
         self.progrss.setWindowTitle('Please wait')
         self.progrss.setLabelText('Disassembling...')
+        self.progrss.setSizeGripEnabled(False)
+        self.progrss.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.progrss.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
+        self.progrss.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        # self.progrss.setModal(True)
         self.progrss.setCancelButton(None)
         self.progrss.setRange(0, 0)
         self.progrss.setMinimumDuration(0)
@@ -485,7 +492,7 @@ class DisassemblyView(QAbstractScrollArea):
                 y_pos = self._header_height + (i * (self._char_height + self._ver_spacing))
                 y_pos += (self._char_height * 0.5)
                 y_pos -= self._ver_spacing
-                painter.fillRect(self._jumps_width + 5, y_pos, self.viewport().width(), self._char_height, self._ctrl_colors['line'])
+                painter.fillRect(self._jumps_width + 5, y_pos - 1, self.viewport().width(), self._char_height + 2, self._ctrl_colors['line'])
             self.paint_line(painter, i + 1, line)
 
         painter.setPen(self._line_pen)

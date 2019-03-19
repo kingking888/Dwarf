@@ -366,3 +366,13 @@ DisassemblyView {
     qproperty-divider: #ccc;
     qproperty-line: #fafafa;
 }
+
+QProgressBar {
+    background: #fff;
+    border-color: #ccc;
+    padding: 1px;
+}
+
+QProgressBar::chunk:horizontal {
+    background: qlineargradient(x1: 0, y1: 0.5, x2: 1, y2: 0.5, stop: 0 #fff, stop: 0.5 #ef5350, stop: 1 #fff);
+}
