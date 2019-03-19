@@ -10,6 +10,7 @@ from capstone.x86_const import *
 from lib.range import Range
 from lib import utils
 from lib.instruction import Instruction
+from ui.dialog_input import InputDialog
 
 
 class DisassemblyView(QAbstractScrollArea):
@@ -39,8 +40,11 @@ class DisassemblyView(QAbstractScrollArea):
         self._longest_bytes = 0
         self._longest_mnemonic = 0
 
-        self.capstone_arch = CS_ARCH_X86
-        self.capstone_mode = CS_MODE_32
+        self.capstone_arch = 0
+        self.capstone_mode = 0
+        self.keystone_arch = 0
+        self.keystone_mode = 0
+        self.on_arch_changed()
 
         self._ctrl_colors = {
             'background': QColor('#181818'),
@@ -61,7 +65,7 @@ class DisassemblyView(QAbstractScrollArea):
         self._solid_pen = QPen(self._ctrl_colors['jump_arrows'], 2.0, Qt.SolidLine)
         self._line_pen = QPen(self._ctrl_colors['divider'], 0, Qt.SolidLine)
 
-        self._breakpoint_linewidth = 15
+        self._breakpoint_linewidth = 5
         self._jumps_width = 100
 
         self.setMouseTracking(True)
@@ -279,9 +283,16 @@ class DisassemblyView(QAbstractScrollArea):
             if len(self._history) > 1:
                 self._history.pop(len(self._history) - 1)
                 self.read_memory(self._history[len(self._history) - 1])
+        elif event.key() == Qt.Key_G and event.modifiers() & Qt.ControlModifier:  # ctrl+g
+            self._on_jump_to()
         else:
             # dispatch those to super
             super().keyPressEvent(event)
+
+    def _on_jump_to(self):
+        ptr, input_ = InputDialog.input_pointer(self._app_window)
+        if ptr > 0:
+            self.read_memory(ptr)
 
     # pylint: disable=C0103
     def mouseMoveEvent(self, event):
@@ -397,7 +408,7 @@ class DisassemblyView(QAbstractScrollArea):
 
     def paint_line(self, painter, num_line, line):
         painter.setPen(self._ctrl_colors['foreground'])
-        drawing_pos_x = self._jumps_width + 5 + self._char_width
+        drawing_pos_x = self._jumps_width + self._breakpoint_linewidth + self._char_width
         drawing_pos_y = num_line * (self._char_height + self._ver_spacing)
         drawing_pos_y += self._header_height
 
@@ -411,7 +422,35 @@ class DisassemblyView(QAbstractScrollArea):
 
         painter.drawText(drawing_pos_x, drawing_pos_y, str_fmt.format(line.address))
 
-        drawing_pos_x = self._jumps_width + self._breakpoint_linewidth + self._char_width
+        is_watched = False
+        is_hooked = False
+
+        if self._app_window.dwarf.is_address_watched(line.address):
+            is_watched = True
+
+        if line.address in self._app_window.dwarf.hooks:
+            is_hooked = True
+
+        if is_watched or is_hooked:
+            if is_watched:
+                height = self._char_height
+                y_pos = drawing_pos_y
+                y_pos -= self._base_line - (self._char_height * 0.5)
+                y_pos += (self._char_height * 0.5)
+                if is_hooked:
+                    y_pos -= (self._char_height * 0.5)
+                    height *= 0.5
+                painter.fillRect(self._jumps_width, y_pos - height, self._breakpoint_linewidth, height, QColor('#4fc3f7'))
+            if is_hooked:
+                height = self._char_height
+                y_pos = drawing_pos_y
+                y_pos -= self._base_line - (self._char_height * 0.5)
+                y_pos += (self._char_height * 0.5)
+                if is_watched:
+                    height *= 0.5
+                painter.fillRect(self._jumps_width, y_pos - height, self._breakpoint_linewidth, height, QColor('#009688'))
+
+        drawing_pos_x = self._jumps_width + self._breakpoint_linewidth + self._char_width + 1 + self._char_width
         drawing_pos_x += ((self._app_window.dwarf.pointer_size * 2) * self._char_width)
 
         painter.setPen(QColor('#444'))
@@ -420,7 +459,7 @@ class DisassemblyView(QAbstractScrollArea):
             painter.drawText(drawing_pos_x, drawing_pos_y, '{0:02x}'.format(byte))
             drawing_pos_x += self._char_width * 3
 
-        drawing_pos_x = self._jumps_width + 5 + ((self._app_window.dwarf.pointer_size * 2) * self._char_width) + (self._longest_bytes + 2) * (self._char_width * 3)
+        drawing_pos_x = self._jumps_width + self._breakpoint_linewidth + ((self._app_window.dwarf.pointer_size * 2) * self._char_width) + (self._longest_bytes + 2) * (self._char_width * 3)
         painter.setPen(QColor('#39c'))
         painter.drawText(drawing_pos_x, drawing_pos_y, line.mnemonic)
         if line.is_jump:
@@ -482,7 +521,7 @@ class DisassemblyView(QAbstractScrollArea):
             painter.setPen(self._ctrl_colors['foreground'])
             drawing_pos_x = self._jumps_width
             self.paint_jumps(painter)
-            painter.fillRect(drawing_pos_x, 0, 5, self.viewport().height(), self._ctrl_colors['jump_arrows'])
+            painter.fillRect(drawing_pos_x, 0, self._breakpoint_linewidth, self.viewport().height(), self._ctrl_colors['jump_arrows'])
 
         for i, line in enumerate(self._lines[self.pos:self.pos + self.visible_lines()]):
             if i > self.visible_lines():
@@ -492,41 +531,40 @@ class DisassemblyView(QAbstractScrollArea):
                 y_pos = self._header_height + (i * (self._char_height + self._ver_spacing))
                 y_pos += (self._char_height * 0.5)
                 y_pos -= self._ver_spacing
-                painter.fillRect(self._jumps_width + 5, y_pos - 1, self.viewport().width(), self._char_height + 2, self._ctrl_colors['line'])
+                painter.fillRect(self._jumps_width + self._breakpoint_linewidth, y_pos - 1, self.viewport().width(), self._char_height + 2, self._ctrl_colors['line'])
             self.paint_line(painter, i + 1, line)
 
         painter.setPen(self._line_pen)
         painter.setBrush(Qt.NoBrush)
-        width = self._jumps_width + self._breakpoint_linewidth + self._char_width
-        width += ((self._app_window.dwarf.pointer_size * 2) * self._char_width)
-        drawing_pos_x = width
+        drawing_pos_x = self._jumps_width + self._breakpoint_linewidth + self._char_width + self._char_width
+        drawing_pos_x += ((self._app_window.dwarf.pointer_size * 2) * self._char_width)
 
         painter.fillRect(drawing_pos_x, 0, 1, self.viewport().height(), self._ctrl_colors['divider'])
 
     def on_arch_changed(self):
-        if self.dwarf.arch == 'arm64':
-            self.cs_arch = CS_ARCH_ARM64
-            self.cs_mode = CS_MODE_LITTLE_ENDIAN
-        elif self.dwarf.arch == 'arm':
-            self.cs_arch = CS_ARCH_ARM
-            self.cs_mode = CS_MODE_ARM
-        elif self.dwarf.arch == 'ia32':
-            self.cs_arch = CS_ARCH_X86
-            self.cs_mode = CS_MODE_32
-        elif self.cs_arch == 'x64':
-            self.cs_arch = CS_ARCH_X86
-            self.cs_mode = CS_MODE_64
-        if self.dwarf.keystone_installed:
+        if self._app_window.dwarf.arch == 'arm64':
+            self.capstone_arch = CS_ARCH_ARM64
+            self.capstone_mode = CS_MODE_LITTLE_ENDIAN
+        elif self._app_window.dwarf.arch == 'arm':
+            self.capstone_arch = CS_ARCH_ARM
+            self.capstone_mode = CS_MODE_ARM
+        elif self._app_window.dwarf.arch == 'ia32':
+            self.capstone_arch = CS_ARCH_X86
+            self.capstone_mode = CS_MODE_32
+        elif self._app_window.dwarf.arch == 'x64':
+            self.capstone_arch = CS_ARCH_X86
+            self.capstone_mode = CS_MODE_64
+        if self._app_window.dwarf.keystone_installed:
             import keystone.keystone_const as ks
-            if self.dwarf.arch == 'arm64':
-                self.ks_arch = ks.KS_ARCH_ARM64
-                self.ks_mode = ks.KS_MODE_LITTLE_ENDIAN
-            elif self.dwarf.arch == 'arm':
-                self.ks_arch = ks.KS_ARCH_ARM
-                self.ks_mode = ks.KS_MODE_ARM
-            elif self.dwarf.arch == 'ia32':
-                self.ks_arch = ks.KS_ARCH_X86
-                self.ks_mode = ks.KS_MODE_32
-            elif self.cs_arch == 'x64':
-                self.ks_arch = ks.KS_ARCH_X86
-                self.ks_mode = ks.KS_MODE_64
+            if self._app_window.dwarf.arch == 'arm64':
+                self.keystone_arch = ks.KS_ARCH_ARM64
+                self.keystone_mode = ks.KS_MODE_LITTLE_ENDIAN
+            elif self._app_window.dwarf.arch == 'arm':
+                self.keystone_arch = ks.KS_ARCH_ARM
+                self.keystone_mode = ks.KS_MODE_ARM
+            elif self._app_window.dwarf.arch == 'ia32':
+                self.keystone_arch = ks.KS_ARCH_X86
+                self.keystone_mode = ks.KS_MODE_32
+            elif self._app_window.dwarf.arch == 'x64':
+                self.keystone_arch = ks.KS_ARCH_X86
+                self.keystone_mode = ks.KS_MODE_64

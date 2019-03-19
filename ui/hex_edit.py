@@ -278,9 +278,9 @@ class HexEditor(QAbstractScrollArea):
             'attention': QColor('#ff3388'),
             'changed': QColor('#ff3388'),
             'hook': QColor('#009688'),
-            'watcher': QColor('#ff5722'),
-            'edited': QColor('#4fc3f7'),
-            'patched': QColor('#4fc3f7'),
+            'watcher': QColor('#4fc3f7'),
+            'edited': QColor('#ff5722'),
+            'patched': QColor('#ff5722'),
             'string': QColor('#8bc34a'),
             'pointer': QColor('#ff9900'),
             'search': QColor('#fc3')

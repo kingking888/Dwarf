@@ -300,7 +300,7 @@ class WatchersPanel(QWidget):
 
         if not from_api:
             # function was called directly so add it to dwarf
-            if not self._app_window.dwarf.dwarf_api('isAddressWatched', ptr):
+            if not self._app_window.dwarf.is_address_watched(ptr):
                 self._app_window.dwarf.dwarf_api('addWatcher', [ptr, flags])
                 return
 

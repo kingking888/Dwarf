@@ -131,6 +131,8 @@ class Dwarf(QObject):
         # kernel
         self._kernel = Kernel(self)
 
+        self._watchers = []
+
         # hooks
         self.hooks = {}
         self.on_loads = {}
@@ -244,6 +246,13 @@ class Dwarf(QObject):
     # ************************************************************************
     # **************************** Functions *********************************
     # ************************************************************************
+
+    def is_address_watched(self, ptr):
+        ptr = utils.parse_ptr(ptr)
+        if ptr in self._watchers:
+            return True
+
+        return False
 
     def attach(self, pid, script=None, print_debug_error=True):
         """ Attach to pid
@@ -608,8 +617,10 @@ class Dwarf(QObject):
             self.log('watcher hit op %s address %s @thread := %s' %
                      (exception['memory']['operation'], exception['memory']['address'], parts[2]))
         elif cmd == 'watcher_added':
+            self._watchers.append(utils.parse_ptr(parts[1]))
             self.onWatcherAdded.emit(parts[1], int(parts[2]))
         elif cmd == 'watcher_removed':
+            self._watchers.remove(utils.parse_ptr(parts[1]))
             self.onWatcherRemoved.emit(parts[1])
         else:
             print('unknown message: ' + what)
