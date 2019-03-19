@@ -262,7 +262,6 @@ class HexEditor(QAbstractScrollArea):
 
         self._background = None
 
-        # todo: use palette
         self._ctrl_colors = {
             'background': QColor('#181818'),
             'foreground': QColor('#666'),
@@ -434,7 +433,7 @@ class HexEditor(QAbstractScrollArea):
 
     @pyqtProperty('QColor', designable=True)
     def foreground(self):
-        return self._ctrl_colors['background']
+        return self._ctrl_colors['foreground']
 
     @foreground.setter
     def foreground(self, value):
@@ -478,7 +477,7 @@ class HexEditor(QAbstractScrollArea):
 
     @line.setter
     def line(self, value):
-        self._ctrl_colors['byte_col_1'] = QColor(value)
+        self._ctrl_colors['linecol'] = QColor(value)
 
     @pyqtProperty('QColor', designable=True)
     def byte(self):

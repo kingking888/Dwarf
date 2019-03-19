@@ -372,3 +372,12 @@ QGroupBox::indicator {
 QPushButton {
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #222, stop:1 #111);
 }*/
+
+DisassemblyView {
+    qproperty-background: #181818;
+    qproperty-foreground: #666;
+    qproperty-jump_arrows: #333;
+    qproperty-jump_arrows_hover: #ef5350;
+    qproperty-divider: #222;
+    qproperty-line: #222;
+}

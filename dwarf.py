@@ -17,6 +17,7 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 import os
 import sys
 import argparse
+from pip import _internal
 from PyQt5.QtWidgets import QApplication
 
 from ui.app import AppWindow
@@ -58,6 +59,7 @@ def _on_restart():
 def run_dwarf():
     """ fire it up
     """
+    #_internal.main(["install", "--upgrade","--user", "frida"])
     args = process_args()
 
     qapp = QApplication([])

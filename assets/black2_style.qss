@@ -51,3 +51,8 @@ HexEditor {
     qproperty-byte: #666;
     qproperty-bytealt: #444;
 }
+
+DisassemblyView {
+    qproperty-background: #1e2125;
+    qproperty-foreground: #666;
+}

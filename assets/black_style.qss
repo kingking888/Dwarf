@@ -362,3 +362,12 @@ QCheckBox::indicator:checked {
 QGroupBox::indicator {
     margin-left: 2px;
 }
+
+DisassemblyView {
+    qproperty-background: #080808;
+    qproperty-foreground: #666;
+    qproperty-jump_arrows: #333;
+    qproperty-jump_arrows_hover: #ef5350;
+    qproperty-divider: #222;
+    qproperty-line: #111;
+}

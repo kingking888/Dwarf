@@ -42,14 +42,24 @@ class DisassemblyView(QAbstractScrollArea):
         self.capstone_arch = CS_ARCH_X86
         self.capstone_mode = CS_MODE_32
 
+        self._ctrl_colors = {
+            'background': QColor('#181818'),
+            'foreground': QColor('#666'),
+            'jump_arrows': QColor('#444'),
+            'jump_arrows_hover': QColor('#ef5350'),
+            'divider': QColor('#666'),
+            'line': QColor('#111'),
+            'selection_fg': QColor(Qt.white),
+            'selection_bg': QColor('#ef5350')
+        }
+
         self._jump_color = QColor('#39a')
-        self._def_color = QColor('#666')
         self._header_height = 0
         self._ver_spacing = 2
 
-        self._dash_pen = QPen(QColor('#333'), 2.0, Qt.DashLine)
-        self._solid_pen = QPen(QColor('#333'), 2.0, Qt.SolidLine)
-        self._line_pen = QPen(QColor('#666'), 0, Qt.SolidLine)
+        self._dash_pen = QPen(self._ctrl_colors['jump_arrows'], 2.0, Qt.DashLine)
+        self._solid_pen = QPen(self._ctrl_colors['jump_arrows'], 2.0, Qt.SolidLine)
+        self._line_pen = QPen(self._ctrl_colors['divider'], 0, Qt.SolidLine)
 
         self._breakpoint_linewidth = 15
         self._jumps_width = 100
@@ -61,6 +71,9 @@ class DisassemblyView(QAbstractScrollArea):
         self._display_jumps = True
         self._follow_jumps = True
 
+    # ************************************************************************
+    # **************************** Properties ********************************
+    # ************************************************************************
     @property
     def display_jumps(self):
         return self._display_jumps
@@ -82,6 +95,58 @@ class DisassemblyView(QAbstractScrollArea):
     def follow_jumps(self, value):
         if isinstance(value, bool):
             self._follow_jumps = value
+
+    @pyqtProperty('QColor', designable=True)
+    def background(self):
+        return self._ctrl_colors['background']
+
+    @background.setter
+    def background(self, value):
+        self._ctrl_colors['background'] = value
+
+    @pyqtProperty('QColor', designable=True)
+    def foreground(self):
+        return self._ctrl_colors['foreground']
+
+    @foreground.setter
+    def foreground(self, value):
+        self._ctrl_colors['foreground'] = QColor(value)
+
+    @pyqtProperty('QColor', designable=True)
+    def divider(self):
+        return self._ctrl_colors['divider']
+
+    @divider.setter
+    def divider(self, value):
+        self._ctrl_colors['divider'] = QColor(value)
+
+    @pyqtProperty('QColor', designable=True)
+    def jump_arrows(self):
+        return self._ctrl_colors['jump_arrows']
+
+    @jump_arrows.setter
+    def jump_arrows(self, value):
+        self._ctrl_colors['jump_arrows'] = QColor(value)
+
+    @pyqtProperty('QColor', designable=True)
+    def jump_arrows_hover(self):
+        return self._ctrl_colors['jump_arrows_hover']
+
+    @jump_arrows_hover.setter
+    def jump_arrows_hover(self, value):
+        self._ctrl_colors['jump_arrows_hover'] = QColor(value)
+
+    @pyqtProperty('QColor', designable=True)
+    def line(self):
+        return self._ctrl_colors['line']
+
+    @line.setter
+    def line(self, value):
+        self._ctrl_colors['line'] = QColor(value)
+
+    # ************************************************************************
+    # **************************** Functions *********************************
+    # ************************************************************************
 
     def add_instruction(self, instruction):
         self._lines.append(instruction)
@@ -245,17 +310,17 @@ class DisassemblyView(QAbstractScrollArea):
         for index, line in enumerate(self._lines[self.pos:self.pos + self.visible_lines()]):
             if line.address in jump_list:  # or line.address in jump_targets:
                 if line.address == self.current_jump:
-                    self._solid_pen.setColor(QColor('#fc3'))
-                    self._dash_pen.setColor(QColor('#fc3'))
+                    self._solid_pen.setColor(self._ctrl_colors['jump_arrows_hover'])
+                    self._dash_pen.setColor(self._ctrl_colors['jump_arrows_hover'])
                 else:
-                    self._solid_pen.setColor(QColor('#333'))
-                    self._dash_pen.setColor(QColor('#333'))
+                    self._solid_pen.setColor(self._ctrl_colors['jump_arrows'])
+                    self._dash_pen.setColor(self._ctrl_colors['jump_arrows'])
                 if line.id == X86_INS_JMP or line.id == X86_INS_CALL:
                     painter.setPen(self._solid_pen)
                 else:
                     painter.setPen(self._dash_pen)
                 drawing_pos_y = (index + 1) * (self._char_height + self._ver_spacing)
-                drawing_pos_y += 1
+                drawing_pos_y -= self._base_line - (self._char_height * 0.5)
 
                 skip = False
 
@@ -274,11 +339,11 @@ class DisassemblyView(QAbstractScrollArea):
                             arrow.append(QPoint(100 - 8, drawing_pos_y - pos2 - 4))
                             arrow.append(QPoint(100 - 8, drawing_pos_y - pos2 + 4))
                             if line.address == self.current_jump:
-                                painter.setBrush(QColor('#fc3'))
-                                painter.setPen(QColor('#fc3'))
+                                painter.setBrush(self._ctrl_colors['jump_arrows_hover'])
+                                painter.setPen(self._ctrl_colors['jump_arrows_hover'])
                             else:
-                                painter.setBrush(QColor('#333'))
-                                painter.setPen(QColor('#333'))
+                                painter.setBrush(self._ctrl_colors['jump_arrows'])
+                                painter.setPen(self._ctrl_colors['jump_arrows'])
                             painter.drawPolygon(arrow)
                 else:
                     skip = True
@@ -295,10 +360,10 @@ class DisassemblyView(QAbstractScrollArea):
                         arrow.append(QPoint(drawing_pos_x + 4, 8))
                         arrow.append(QPoint(drawing_pos_x - 4, 8))
                         if line.address == self.current_jump:
-                            painter.setBrush(QColor('#fc3'))
+                            painter.setBrush(self._ctrl_colors['jump_arrows_hover'])
                             painter.setPen(Qt.NoPen)
                         else:
-                            painter.setBrush(QColor('#333'))
+                            painter.setBrush(self._ctrl_colors['jump_arrows'])
                             painter.setPen(Qt.NoPen)
                         painter.drawPolygon(arrow)
                     elif line.address < line.jump_address:
@@ -312,10 +377,10 @@ class DisassemblyView(QAbstractScrollArea):
                         arrow.append(QPoint(drawing_pos_x + 4, self.viewport().height() - 8))
                         arrow.append(QPoint(drawing_pos_x - 4, self.viewport().height() - 8))
                         if line.address == self.current_jump:
-                            painter.setBrush(QColor('#fc3'))
+                            painter.setBrush(self._ctrl_colors['jump_arrows_hover'])
                             painter.setPen(Qt.NoPen)
                         else:
-                            painter.setBrush(QColor('#333'))
+                            painter.setBrush(self._ctrl_colors['jump_arrows'])
                             painter.setPen(Qt.NoPen)
                         painter.drawPolygon(arrow)
 
@@ -324,7 +389,7 @@ class DisassemblyView(QAbstractScrollArea):
                     break
 
     def paint_line(self, painter, num_line, line):
-        painter.setPen(self._def_color)
+        painter.setPen(self._ctrl_colors['foreground'])
         drawing_pos_x = self._jumps_width + 5 + self._char_width
         drawing_pos_y = num_line * (self._char_height + self._ver_spacing)
         drawing_pos_y += self._header_height
@@ -354,7 +419,7 @@ class DisassemblyView(QAbstractScrollArea):
         if line.is_jump:
             painter.setPen(self._jump_color)
         else:
-            painter.setPen(self._def_color)
+            painter.setPen(self._ctrl_colors['foreground'])
 
         drawing_pos_x += (self._longest_mnemonic + 1) * self._char_width
         if line.operands and not line.is_jump:
@@ -370,7 +435,7 @@ class DisassemblyView(QAbstractScrollArea):
                 drawing_pos_x += len(ops_str[a] * self._char_width)
 
                 if len(line.operands) > 1 and a == 0:
-                    painter.setPen(self._def_color)
+                    painter.setPen(self._ctrl_colors['foreground'])
                     painter.drawText(drawing_pos_x, drawing_pos_y, ', ')
                     drawing_pos_x += 2 * self._char_width
                 # if ops_str[a].startswith('0x') and not line.string:
@@ -404,13 +469,13 @@ class DisassemblyView(QAbstractScrollArea):
         painter = QPainter(self.viewport())
 
         # fill background
-        painter.fillRect(0, 0, self.viewport().width(), self.viewport().height(), QColor('#181818'))
+        painter.fillRect(0, 0, self.viewport().width(), self.viewport().height(), self._ctrl_colors['background'])
 
         if self._display_jumps:
-            painter.setPen(self._def_color)
+            painter.setPen(self._ctrl_colors['foreground'])
             drawing_pos_x = self._jumps_width
-            painter.fillRect(drawing_pos_x, 0, 5, self.viewport().height(), QColor('#222'))
             self.paint_jumps(painter)
+            painter.fillRect(drawing_pos_x, 0, 5, self.viewport().height(), self._ctrl_colors['jump_arrows'])
 
         for i, line in enumerate(self._lines[self.pos:self.pos + self.visible_lines()]):
             if i > self.visible_lines():
@@ -420,7 +485,7 @@ class DisassemblyView(QAbstractScrollArea):
                 y_pos = self._header_height + (i * (self._char_height + self._ver_spacing))
                 y_pos += (self._char_height * 0.5)
                 y_pos -= self._ver_spacing
-                painter.fillRect(self._jumps_width + 5, y_pos, self.viewport().width(), self._char_height, QColor('#111'))
+                painter.fillRect(self._jumps_width + 5, y_pos, self.viewport().width(), self._char_height, self._ctrl_colors['line'])
             self.paint_line(painter, i + 1, line)
 
         painter.setPen(self._line_pen)
@@ -429,7 +494,7 @@ class DisassemblyView(QAbstractScrollArea):
         width += ((self._app_window.dwarf.pointer_size * 2) * self._char_width)
         drawing_pos_x = width
 
-        painter.fillRect(drawing_pos_x, 0, 1, self.viewport().height(), QColor('#222'))
+        painter.fillRect(drawing_pos_x, 0, 1, self.viewport().height(), self._ctrl_colors['divider'])
 
     def on_arch_changed(self):
         if self.dwarf.arch == 'arm64':
