@@ -39,17 +39,14 @@ from lib.prefs import Prefs
 VFP = "4ff4700001ee500fbff36f8f4ff08043e8ee103a"
 
 
-class EmulatorSetupFailedError(Exception):
-    """ Setup Failed
-    """
-
-
-class EmulatorAlreadyRunningError(Exception):
-    """ isrunning
-    """
-
-
 class Emulator(QThread):
+    class EmulatorSetupFailedError(Exception):
+        """ Setup Failed
+        """
+
+    class EmulatorAlreadyRunningError(Exception):
+        """ isrunning
+        """
 
     onEmulatorStart = pyqtSignal(name='onEmulatorStart')
     onEmulatorStop = pyqtSignal(name='onEmulatorStop')
@@ -135,10 +132,10 @@ class Emulator(QThread):
             self.setup_x64()
         else:
             # unsupported arch
-            raise EmulatorSetupFailedError('Unsupported arch')
+            raise self.EmulatorSetupFailedError('Unsupported arch')
 
         if not self.uc or not self.cs:
-            raise EmulatorSetupFailedError('Unicorn or Capstone missing')
+            raise self.EmulatorSetupFailedError('Unicorn or Capstone missing')
 
         # enable capstone details
         if self.cs is not None:
@@ -146,7 +143,7 @@ class Emulator(QThread):
 
         err = self.map_range(self.context.pc.value)
         if err:
-            raise EmulatorSetupFailedError('Mapping failed')
+            raise self.EmulatorSetupFailedError('Mapping failed')
 
         self.current_context = EmulatorContext(self.dwarf)
         for reg in self.current_context._unicorn_registers:
@@ -158,9 +155,9 @@ class Emulator(QThread):
         self.uc.hook_add(unicorn.UC_HOOK_MEM_WRITE | unicorn.UC_HOOK_MEM_READ,
                          self.hook_mem_access)
         self.uc.hook_add(
-            unicorn.UC_HOOK_MEM_FETCH_UNMAPPED
-            | unicorn.UC_HOOK_MEM_WRITE_UNMAPPED
-            | unicorn.UC_HOOK_MEM_READ_UNMAPPED, self.hook_unmapped)
+            unicorn.UC_HOOK_MEM_FETCH_UNMAPPED |
+            unicorn.UC_HOOK_MEM_WRITE_UNMAPPED |
+            unicorn.UC_HOOK_MEM_READ_UNMAPPED, self.hook_unmapped)
         self.current_context.set_context(self.uc)
         return True
 
@@ -346,7 +343,7 @@ class Emulator(QThread):
 
         try:
             self._setup()
-        except EmulatorSetupFailedError:
+        except self.EmulatorSetupFailedError:
             return False
 
         return True
@@ -359,7 +356,7 @@ class Emulator(QThread):
 
     def emulate(self, until=0):
         if self.isRunning():
-            raise EmulatorAlreadyRunningError()
+            raise self.EmulatorAlreadyRunningError()
 
         if isinstance(until, str):
             try:
@@ -371,11 +368,11 @@ class Emulator(QThread):
             self.end_ptr = utils.parse_ptr(until)
             if self.end_ptr == 0:
                 # invalid end pointer
-                raise EmulatorSetupFailedError('Invalid EndPtr')
+                raise self.EmulatorSetupFailedError('Invalid EndPtr')
 
         if self.context is None:
             if not self.setup():
-                raise EmulatorSetupFailedError('Setup failed')
+                raise self.EmulatorSetupFailedError('Setup failed')
 
         # calculate the start address
         address = self._current_instruction
@@ -389,7 +386,7 @@ class Emulator(QThread):
             elif self.uc._arch == unicorn.UC_ARCH_X86 and self.uc._mode == unicorn.UC_MODE_64:
                 address = self.uc.reg_read(unicorn.x86_const.UC_X86_REG_RIP)
             else:
-                raise EmulatorSetupFailedError('Unsupported arch')
+                raise self.EmulatorSetupFailedError('Unsupported arch')
 
         if until > 0:
             self.log_to_ui('[*] start emulation from %s to %s' % (hex(address), hex(self.end_ptr)))

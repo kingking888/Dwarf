@@ -204,6 +204,7 @@ class DeviceBar(QWidget):
         self._update_btn = QPushButton('Update Frida', self.update_label)
         self._update_btn.setStyleSheet('padding: 0; border-color: white;')
         self._update_btn.setGeometry(self.update_label.width() - 110, 5, 100, 25)
+        self._update_btn.clicked.connect(self._on_install_btn)
         self._update_btn.setVisible(False)
         self._restart_btn = QPushButton('Restart Frida', self.update_label)
         self._restart_btn.setStyleSheet('padding: 0; border-color: white;')

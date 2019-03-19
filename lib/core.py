@@ -39,19 +39,10 @@ from ui.dialog_input import InputDialog
 from ui.panel_trace import TraceEvent
 
 
-class NoDeviceAssignedError(Exception):
-    """ Raised when no Device
-    """
-
-
-class CoreScriptNotFoundError(Exception):
-    """ Raised when dwarfscript not found
-    """
-
-
 class EmulatorThread(QThread):
 
     onCmdCompleted = pyqtSignal(str, name='onCmdCompleted')
+    onError = pyqtSignal(str, name='onError')
 
     def __init__(self, parent=None):
         super().__init__(parent=parent)
@@ -60,11 +51,26 @@ class EmulatorThread(QThread):
 
     def run(self):
         if self.emulator and self.cmd:
-            result = self.emulator.api(self.cmd)
-            self.onCmdCompleted.emit(str(result))
+            try:
+                result = self.emulator.api(self.cmd)
+                self.onCmdCompleted.emit(str(result))
+            except Emulator.EmulatorSetupFailedError as error:
+                result = False
+                self.onError.emit(error)
+            except Emulator.EmulatorAlreadyRunningError as error:
+                result = False
+                self.onError.emit(error)
 
 
 class Dwarf(QObject):
+    class NoDeviceAssignedError(Exception):
+        """ Raised when no Device
+        """
+
+    class CoreScriptNotFoundError(Exception):
+        """ Raised when dwarfscript not found
+        """
+
     # ************************************************************************
     # **************************** Signals ***********************************
     # ************************************************************************
@@ -147,6 +153,7 @@ class Dwarf(QObject):
         self._emulator = Emulator(self)
         self._emu_thread = EmulatorThread(self)
         self._emu_thread.onCmdCompleted.connect(self._on_emu_completed)
+        self._emu_thread.onError.connect(self._on_emu_error)
         self._emu_thread.emulator = self.emulator
         self._emu_queue = []
 
@@ -209,7 +216,6 @@ class Dwarf(QObject):
     @property
     def pid(self):
         return self._pid
-        # return self.device.pid
 
     @property
     def platform(self):
@@ -232,8 +238,6 @@ class Dwarf(QObject):
         try:
             if isinstance(value, frida.core.Device):
                 self._device = value
-            # elif isinstance(value, DwarfDevice):
-            #    self._device = value
         except ValueError:
             self._device = None
 
@@ -245,7 +249,7 @@ class Dwarf(QObject):
         """ Attach to pid
         """
         if self.device is None:
-            raise NoDeviceAssignedError()
+            raise self.NoDeviceAssignedError('No Device assigned')
 
         if self._process is not None:
             self.detach()
@@ -308,7 +312,7 @@ class Dwarf(QObject):
     def load_script(self, script=None):
         try:
             if not os.path.exists('lib/core.js'):
-                raise CoreScriptNotFoundError()
+                raise self.CoreScriptNotFoundError('core.js not found!')
 
             with open('lib/core.js', 'r') as core_script:
                 sript_content = core_script.read()
@@ -335,7 +339,7 @@ class Dwarf(QObject):
 
     def spawn(self, package, script=None):
         if self.device is None:
-            raise NoDeviceAssignedError()
+            raise self.NoDeviceAssignedError('No Device assigned')
 
         if self._process is not None:
             self.detach()
@@ -464,8 +468,8 @@ class Dwarf(QObject):
         self.native_traced_tid = 0
         # self._app_window.get_menu().on_native_tracer_change(False)
 
-    def read_memory(self, ptr, len):
-        if len > 1024 * 1024:
+    def read_memory(self, ptr, length):
+        if length > 1024 * 1024:
             position = 0
             next_size = 1024 * 1024
             data = bytearray()
@@ -475,7 +479,7 @@ class Dwarf(QObject):
                 except:
                     return None
                 position += next_size
-                diff = len - position
+                diff = length - position
                 if diff > 1024 * 1024:
                     next_size = 1024 * 1024
                 elif diff > 0:
@@ -486,7 +490,7 @@ class Dwarf(QObject):
             del data
             return ret
         else:
-            return self.dwarf_api('readBytes', [ptr, len])
+            return self.dwarf_api('readBytes', [ptr, length])
 
     def remove_watcher(self, ptr):
         return self.dwarf_api('removeWatcher', ptr)
@@ -667,3 +671,8 @@ class Dwarf(QObject):
             self._emu_thread.start()
         else:
             self._emu_thread.cmd = ''
+
+    def _on_emu_error(self, err_str):
+        self.log(err_str)
+        if self._emu_queue:
+            self._emu_queue.clear()
