@@ -84,7 +84,7 @@ class AppWindow(QMainWindow):
 
         # themes
         self.prefs = Prefs()
-        self.set_theme(self.prefs.get('dwarf_ui_theme', 'dark'))
+        self.set_theme(self.prefs.get('dwarf_ui_theme', 'black'))
 
         # set icon
         if os.name == 'nt':

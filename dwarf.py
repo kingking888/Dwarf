@@ -17,7 +17,6 @@ Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
 import os
 import sys
 import argparse
-from pip import _internal
 from PyQt5.QtWidgets import QApplication
 
 from ui.app import AppWindow
