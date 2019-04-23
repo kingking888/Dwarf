@@ -228,7 +228,7 @@ class WelcomeDialog(QDialog):
         ico = QIcon(QPixmap(utils.resource_path('assets/apple.png')))
         btn.setIconSize(QSize(75, 75))
         btn.setIcon(ico)
-        btn.setToolTip('New Android Session')
+        btn.setToolTip('New iOS Session')
         wrapper.addWidget(btn)
 
         btn = QPushButton()
