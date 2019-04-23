@@ -331,7 +331,6 @@ class Dwarf(QObject):
             self._script.load()
 
             if script is not None:
-                user_script = ''
                 if os.path.exists(script):
                     with open(script, 'r') as script_file:
                         user_script = script_file.read()
