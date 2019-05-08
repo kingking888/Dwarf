@@ -302,8 +302,12 @@ class Adb(QObject):
             try:
                 _path = _path.join(_path.split())  # remove \r\n
                 _path = _path.split(':')
-                if len(_path) == 2 and _path[0] == 'package':
-                    return _path[1]
+                if len(_path) > 1 and _path[0] == 'package':
+                    ret = _path[1]
+                    if ret.endswith('apkpackage'):
+                        # handle new android packages
+                        ret = '/'.join(ret.split('/')[:-1])
+                    return ret
             except ValueError:
                 pass
 

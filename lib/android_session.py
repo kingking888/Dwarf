@@ -225,6 +225,7 @@ class AndroidSession(Session):
             # smalistuff
             self._app_window.show_progress('Baksmali ' + package_name + ' ...')
             _smali_thread = SmaliThread(self, package_name)
+            _smali_thread.onError.connect(self._app_window.hide_progress)
             _smali_thread.onFinished.connect(self._app_window.hide_progress)
             _smali_thread.start()
 
