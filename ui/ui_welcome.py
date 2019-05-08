@@ -362,7 +362,7 @@ class WelcomeUi(QSplitter):
                 #self.menu_bar = w.get_menu()
                 self.status_bar = w.get_statusbar()
 
-        self.update_action = QAction('Update DWARF')
+        self.update_action = QAction('Update Dwarf')
         self.update_action.triggered.connect(self.update_dwarf)
 
         self.setup_ui()
@@ -408,8 +408,8 @@ class WelcomeUi(QSplitter):
         icon.setFixedWidth(75)
         head.addWidget(icon)
 
-        # main title
-        title = QLabel('DWARF')
+        # main titleDwarf
+        title = QLabel('Dwarf')
         title.setFont(QFont('Anton', 58, QFont.Bold))
         head.addWidget(title)
 

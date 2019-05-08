@@ -147,6 +147,7 @@ class Dwarf(QObject):
         self.contexts = {}
         self.context_tid = 0
         self._platform = ''
+        self.loading_library = None
 
         # tracers
         self._native_traced_tid = 0
@@ -173,6 +174,7 @@ class Dwarf(QObject):
     def _reinitialize(self):
         self.java_available = False
         self._loading_library = False
+        self.loading_library = None
 
         # frida device
         self._device = None
@@ -686,3 +688,7 @@ class Dwarf(QObject):
         self.log(err_str)
         if self._emu_queue:
             self._emu_queue.clear()
+
+    @loading_library.setter
+    def loading_library(self, value):
+        self._loading_library = value

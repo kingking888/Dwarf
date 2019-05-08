@@ -119,7 +119,8 @@ class UpdateBar(QWidget):
         """
         h_box = QHBoxLayout()
         h_box.setContentsMargins(0, 0, 0, 0)
-        update_label = QLabel('A newer Version of DWARF is available. Checkout <a style="color:white;" href="https://github.com/iGio90/Dwarf">DWARF on GitHub</a> for more informations')
+        update_label = QLabel('A newer Version of Dwarf is available. Checkout <a style="color:white;" '
+                              'href="https://github.com/iGio90/Dwarf">Dwarf on GitHub</a> for more informations')
         update_label.setOpenExternalLinks(True)
         update_label.setTextFormat(Qt.RichText)
         update_label.setFixedHeight(35)
@@ -197,7 +198,7 @@ class WelcomeDialog(QDialog):
         head.addWidget(icon)
 
         # main title
-        title = QLabel('DWARF')
+        title = QLabel('Dwarf')
         title.setFont(QFont('Anton', 85, QFont.Bold))
         title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         head.addWidget(title)

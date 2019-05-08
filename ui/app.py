@@ -74,7 +74,7 @@ class AppWindow(QMainWindow):
         self.welcome_window = None
 
         self.setWindowTitle(
-            'DWARF - A debugger for reverse engineers, crackers and security analyst'
+            'Dwarf - A debugger for reverse engineers, crackers and security analyst'
         )
 
         # load external assets
@@ -159,10 +159,10 @@ class AppWindow(QMainWindow):
             self.welcome_window.onIsNewerVersion.connect(self._enable_update_menu)
             self.welcome_window.onUpdateComplete.connect(self._on_dwarf_updated)
             self.welcome_window.setWindowTitle(
-                'Welcome to DWARF - A debugger for reverse engineers, crackers and security analyst'
+                'Welcome to Dwarf - A debugger for reverse engineers, crackers and security analyst'
             )
             self.welcome_window.onSessionSelected.connect(self._start_session)
-            # wait for welcomescreen
+            # wait for welcome screen
             self.hide()
             self.welcome_window.show()
         else:
@@ -181,7 +181,7 @@ class AppWindow(QMainWindow):
 
     def _setup_main_menu(self):
         self.menu = self.menuBar()
-        dwarf_menu = QMenu('DWARF', self)
+        dwarf_menu = QMenu('Dwarf', self)
         if self._is_newer_dwarf:
             dwarf_menu.addAction('Update', self._update_dwarf)
         dwarf_menu.addAction('Exit', self.session_closed)

@@ -1,4 +1,4 @@
-# DWARF
+# Dwarf
 
 A debugger for reverse engineers, crackers and security analyst.
 Or you can call it damn, why are raspberries so fluffy or yet, duck warriors are rich as fuck. Whatever you like!

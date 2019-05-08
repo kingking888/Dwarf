@@ -351,9 +351,9 @@ class DeviceWindow(QDialog):
         try:
             if device == 'local':
                 self.device = frida.get_local_device()
-                self.setWindowTitle('DWARF - Local Session')
+                self.setWindowTitle('Dwarf - Local Session')
             elif device == 'usb':
-                self.setWindowTitle('DWARF - USB Session')
+                self.setWindowTitle('Dwarf - USB Session')
                 #self.device = frida.get_usb_device()
                 self.device = None
             else:
