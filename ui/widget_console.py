@@ -146,7 +146,7 @@ class QConsoleWidget(QWidget):
         time_stamp = datetime.datetime.now().strftime("%H:%M:%S.%f")
         self.output.appendHtml(
             '<p><font color="yellowgreen" size="2" style="font-style:italic">'
-            + time_stamp + '</font>&nbsp;&nbsp;' + html_text + '</p><br />')
+            + time_stamp + '</font>&nbsp;&nbsp;' + html_text + '</p>')
         self.output.verticalScrollBar().setValue(
             self.output.verticalScrollBar().maximum())
 

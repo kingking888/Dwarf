@@ -155,11 +155,7 @@ class ContextPanel(QTabWidget):
 
         context_ptr = ptr
 
-        for register in sorted(context):
-            # todo: ???
-            if register.lower() == 'tojson':
-                continue
-
+        for register in context:
             reg_name = QStandardItem()
             reg_name.setTextAlignment(Qt.AlignCenter)
             if context[register]['isValidPointer']:
@@ -203,10 +199,8 @@ class ContextPanel(QTabWidget):
                         elif context[register]['telescope'][0] != 1:
                             telescope.setForeground(Qt.darkGray)
 
-            self._nativectx_model.appendRow(
-                [reg_name, value_x, value_dec, telescope])
+            self._nativectx_model.insertRow(0, [reg_name, value_x, value_dec, telescope])
             self._nativectx_list.resizeColumnToContents(0)
-            self._nativectx_list.resizeColumnToContents(1)
 
     def _set_emulator_context(self, ptr, context):
         if self.indexOf(self._emulatorctx_list) == -1:

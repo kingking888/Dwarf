@@ -127,6 +127,7 @@ class Dwarf(QObject):
         self._process = None
         self._script = None
         self._spawned = False
+        self._resumed = False
 
         # kernel
         self._kernel = Kernel(self)
@@ -342,10 +343,10 @@ class Dwarf(QObject):
             self.onScriptLoaded.emit()
         except frida.TimedOutError:
             print('frida timeout')
-            self.on_destroyed()
+            self._on_destroyed()
         except frida.TransportError:
             print('frida transporterror')
-            self.on_destroyed()
+            self._on_destroyed()
 
     def spawn(self, package, script=None):
         if self.device is None:
@@ -365,6 +366,11 @@ class Dwarf(QObject):
         self.onAttached.emit([self.pid, package])
         self.load_script(script)
         return 0
+
+    def resume_proc(self):
+        if self._spawned:
+            self._resumed = True
+            self.device.resume(self._pid)
 
     def add_watcher(self, ptr=None):
         if ptr is None:
@@ -599,9 +605,6 @@ class Dwarf(QObject):
                 self.onSetData.emit(['raw', parts[1], data])
             else:
                 self.onSetData.emit(['plain', parts[1], str(parts[2])])
-        elif cmd == 'script_loaded':
-            if self._spawned:
-                self.device.resume(self._pid)
         elif cmd == 'tracer':
             self.onTraceData.emit(parts[1])
         elif cmd == 'unhandled_exception':

@@ -32,9 +32,9 @@ class ConsolePanel(QTabWidget):
 
         self.emu_console = QConsoleWidget(parent, has_input=False)
 
-        self.addTab(self.js_console, 'JavaScript')
-        self.addTab(self.py_console, 'Python')
-        self.addTab(self.emu_console, 'Emulator')
+        self.addTab(self.js_console, 'javascript')
+        self.addTab(self.py_console, 'python')
+        self.addTab(self.emu_console, 'emulator')
 
     def clear(self):
         self.js_console.clear()
