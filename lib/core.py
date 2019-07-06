@@ -685,6 +685,8 @@ class Dwarf(QObject):
                 self.onSetData.emit(['raw', parts[1], data])
             else:
                 self.onSetData.emit(['plain', parts[1], str(parts[2])])
+        elif cmd == 'stalker_callout':
+            print(parts[1])
         elif cmd == 'unhandled_exception':
             # todo
             pass

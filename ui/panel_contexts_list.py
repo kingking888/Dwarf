@@ -127,13 +127,23 @@ class ContextsListPanel(DwarfListView):
             tid = int(item.text())
             data = item.data(Qt.UserRole + 1)
             is_java = data['is_java']
-            glbl_pt = self.mapToGlobal(pos)
+
             context_menu = QMenu()
+            if not is_java:
+                traced_tid = self.dwarf.dwarf_api('getTracedTid')
+                if traced_tid > 0:
+                    context_menu.addAction('Trace', lambda: self._on_cm_start_trace(tid))
+                else:
+                    context_menu.addAction('Stop trace', self._on_cm_stop_trace())
+                context_menu.addSeparator()
+
+            glbl_pt = self.mapToGlobal(pos)
             context_menu.addAction('Resume', lambda: self.dwarf.dwarf_api('release', tid))
             context_menu.exec_(glbl_pt)
 
     def _on_cm_start_trace(self, tid):
-        self.dwarf.native_tracer_start(int(tid))
+        self.dwarf.dwarf_api('startNativeTracer', tid)
+        self.dwarf.dwarf_api('release', tid)
 
     def _on_cm_stop_trace(self):
-        self.dwarf.native_tracer_stop()
+        self.dwarf.dwarf_api('stopNativeTracer')

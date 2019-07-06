@@ -32,8 +32,6 @@ class ConsolePanel(QSplitter):
         self.py_console = DwarfConsoleWidget(parent, input_placeholder='>>>')
         self.py_console.onCommandExecute.connect(self.py_callback)
 
-        self.emu_console = DwarfConsoleWidget(parent, has_input=False)
-
         self.qtabs.addTab(self.js_console, 'javascript')
         self.qtabs.addTab(self.py_console, 'python')
 
