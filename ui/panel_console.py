@@ -29,9 +29,6 @@ class ConsolePanel(QSplitter):
         self.js_console = DwarfConsoleWidget(parent, input_placeholder='$>', function_box=True)
         self.js_console.onCommandExecute.connect(self.js_callback)
 
-        #self.r2_console = DwarfConsoleWidget(parent, input_placeholder='r2')
-        #self.r2_console.onCommandExecute.connect(self.r2_callback)
-
         self.py_console = DwarfConsoleWidget(parent, input_placeholder='>>>')
         self.py_console.onCommandExecute.connect(self.py_callback)
 
@@ -39,8 +36,6 @@ class ConsolePanel(QSplitter):
 
         self.qtabs.addTab(self.js_console, 'javascript')
         self.qtabs.addTab(self.py_console, 'python')
-        #self.addTab(self.r2_console, 'r2')
-        self.qtabs.addTab(self.emu_console, 'emulator')
 
         self.events = DwarfConsoleWidget(parent, has_input=False)
 
@@ -60,9 +55,6 @@ class ConsolePanel(QSplitter):
     def get_r2_console(self):
         return self.r2_console
 
-    def get_emu_console(self):
-        return self.emu_console
-
     def get_events_console(self):
         return self.events
 
@@ -72,10 +64,6 @@ class ConsolePanel(QSplitter):
             self.qtabs.setCurrentIndex(0)
         elif tab_name == 'python':
             self.qtabs.setCurrentIndex(1)
-        #elif tab_name == 'r2':
-        #    self.setCurrentIndex(2)
-        elif tab_name == 'emulator':
-            self.qtabs.setCurrentIndex(2)
         else:
             self.qtabs.setCurrentIndex(0)
 
