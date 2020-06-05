@@ -12,14 +12,22 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.
-    If not, see <https://www.gnu.org/licenses/>
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-import sys
-from dwarf_debugger.dwarf import run_dwarf
+import os
 
-if __name__ == '__main__':
-    if sys.version_info.major < 3:
-        exit('Python3 required!')
+import urllib.request
 
-    run_dwarf()
+
+def tool_exist(tool):
+    if not os.path.exists('tools'):
+        os.mkdir('tools')
+        return False
+    return os.path.exists('tools/%s' % tool)
+
+
+def get_tool(url, path):
+    if not os.path.exists('tools'):
+        os.mkdir('tools')
+
+    urllib.request.urlretrieve(url, 'tools/%s' % path)

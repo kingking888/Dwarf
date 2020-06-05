@@ -12,14 +12,15 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.
-    If not, see <https://www.gnu.org/licenses/>
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-import sys
-from dwarf_debugger.dwarf import run_dwarf
 
-if __name__ == '__main__':
-    if sys.version_info.major < 3:
-        exit('Python3 required!')
+class CpuRegister():
+    __slots__ = ['name', 'description', 'value']
 
-    run_dwarf()
+    def __init__(self, name, value, description=None):
+        self.name = name
+        self.value = value
+        self.description = 'Register'
+        if description:
+            self.description = description

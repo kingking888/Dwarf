@@ -1,5 +1,5 @@
 """
-    Dwarf - Copyright (C) 2019 Giovanni Rocca (iGio90)
+    Dwarf - Copyright (C) 2018-2020 Giovanni Rocca (iGio90)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,12 +17,12 @@
 """
 from setuptools import setup, find_packages
 
-from dwarf.dwarf import DWARF_VERSION
+from dwarf_debugger.version import DWARF_VERSION
 
 setup(
 
     # Package info
-    name='dwarf',
+    name='dwarf_debugger',
     version=DWARF_VERSION,
     author="Giovanni Rocca (iGio90)",
     author_email="giovanni.rocca.90@gmail.com",
@@ -40,20 +40,20 @@ setup(
     include_package_data=True,
     # Dependencies
     install_requires=[
-        'capstone>=4.0.1', 'requests>=2.22.0', 'frida>=12.6.23',
+        'capstone>=4.0.1', 'requests>=2.22.0', 'frida>=12.8.0',
         'PyQt5>=5.11.3', 'pyperclip>=1.7.0'
     ],
     # Script info
     entry_points={'console_scripts':
         [
-            'dwarf = dwarf.dwarf:main',
-            'dwarf-creator = dwarf.creator:main',
-            'dwarf-injector = dwarf.injector:main'
+            'dwarf = dwarf_debugger.dwarf:main',
+            'dwarf-creator = dwarf_debugger.creator:main',
+            'dwarf-injector = dwarf_debugger.injector:main',
+            'dwarf-trace = dwarf_debugger.trace:main'
         ]},
     classifiers=[
         "Development Status :: 4 - Beta",
         "Programming Language :: Python :: 3",
-        "LICENSE :: OSI APPROVED :: GNU LESSER GENERAL PUBLIC LICENSE V3 OR LATER (LGPLV3+)",
         "Operating System :: OS Independent",
         "Operating System :: POSIX",
         "Operating System :: Microsoft :: Windows",

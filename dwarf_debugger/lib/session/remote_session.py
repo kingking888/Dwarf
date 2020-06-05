@@ -12,14 +12,28 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.
-    If not, see <https://www.gnu.org/licenses/>
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-import sys
-from dwarf_debugger.dwarf import run_dwarf
+import frida
 
-if __name__ == '__main__':
-    if sys.version_info.major < 3:
-        exit('Python3 required!')
+from dwarf_debugger.lib.session.session import Session
 
-    run_dwarf()
+
+class RemoteSession(Session):
+
+    def __init__(self, app_window):
+        super(RemoteSession, self).__init__(app_window)
+
+    @property
+    def session_type(self):
+        """ return session name to show in menus etc
+        """
+        return 'remote'
+
+    @property
+    def device_manager_type(self):
+        return 'remote'
+
+    @property
+    def frida_device(self):
+        return frida.get_remote_device()

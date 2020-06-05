@@ -12,14 +12,13 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program.
-    If not, see <https://www.gnu.org/licenses/>
+    along with this program.  If not, see <https://www.gnu.org/licenses/>
 """
-import sys
-from dwarf_debugger.dwarf import run_dwarf
 
-if __name__ == '__main__':
-    if sys.version_info.major < 3:
-        exit('Python3 required!')
 
-    run_dwarf()
+class Function:
+    def __init__(self, symbol, exported=False):
+        self.name = symbol['name']
+        self.address = symbol['address']
+
+        self.exported = exported

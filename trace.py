@@ -16,10 +16,10 @@
     If not, see <https://www.gnu.org/licenses/>
 """
 import sys
-from dwarf_debugger.dwarf import run_dwarf
+from dwarf_debugger.trace import main
 
 if __name__ == '__main__':
     if sys.version_info.major < 3:
         exit('Python3 required!')
 
-    run_dwarf()
+    main()
